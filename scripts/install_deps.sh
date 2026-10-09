@@ -84,12 +84,35 @@ command -v rpm  >/dev/null || die "rpm not found; this script is Fedora-only"
 #                        Wayland desktop session regardless (README section 1).
 REQUIRED=(
   git          # fetch, gclient, pinning to the CHROMIUM_VERSION tag
-  perl         # several third_party build scripts
-  binutils     # host ar, ld, nm, objcopy, strip (upstream dev_list)
-  bison        # third_party parser generators   (upstream dev_list)
-  flex         # third_party lexer generators    (upstream dev_list)
-  gperf        # perfect-hash generators         (upstream dev_list)
+  binutils     # `strip`, used once by scripts/package_tma.sh
 )
+
+# DELIBERATELY DROPPED from upstream's install-build-deps.py dev_list, each
+# verified rather than assumed. The check was to shadow the tool with a stub
+# that prints BLOCKED and exits 1, then run `./build.sh setup` and rebuild
+# every target those tools feed -- a build with zero BLOCKED lines proves the
+# tool is never invoked.
+#
+#   perl   `grep -c` over `ninja -t commands tma` (39,479 lines) is 0, and
+#          there is no perl rule in out/Default/toolchain.ninja at all.
+#   bison  same: 0 commands, 0 rules. The `*.y` parsers in third_party ship
+#          their generated output, and TMA's closure reaches none of the
+#          remaining generators.
+#   flex   same: 0 commands, 0 rules (the 7 apparent `flex` hits are
+#          `flex_layout_algorithm.o` -- filenames, not the lexer).
+#   gperf  Chromium carries its own at third_party/gperf/cipd/bin/gperf, and
+#          that is the path every rule names; system gperf is never read.
+#          (The `*.gperf` inputs under net/ and components/ are consumed by
+#          net/tools/dafsa/make_dafsa.py, which is Python and calls no gperf.)
+#
+# Not dropped, because it really is used:
+#
+#   binutils  ar, ld, nm and objcopy all come from the hermetic
+#             third_party/llvm-build toolchain (llvm-ar, lld, llvm-nm,
+#             llvm-objcopy), so only `strip` needs the system copy -- but
+#             scripts/package_tma.sh:111 does call it, and there is no
+#             llvm-strip wrapper in this repo yet.
+
 
 installed=()
 missing=()
