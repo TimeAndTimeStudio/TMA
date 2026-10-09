@@ -19,11 +19,13 @@ die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+source "$SCRIPT_DIR/tma_conf.sh"
+
 CHROMIUM_SRC="${CHROMIUM_SRC:-$HOME/chromium/src}"
 TMA_OUT="${TMA_OUT:-$CHROMIUM_SRC/out/Default}"
 
-EXE="$TMA_OUT/tma"
-[[ -x "$EXE" ]] || die "$EXE not found; run scripts/build_tma.sh first"
+EXE="$TMA_OUT/$(tma_conf_name)"
+[[ -x "$EXE" ]] || die "$EXE not found; run scripts/build_tma.sh first (or set app_name in tma.conf back to the name the build produced)"
 
 # TMA is built with ozone_auto_platforms=false / ozone_platform="wayland", so
 # there is no X11 or headless fallback: without a Wayland connection the

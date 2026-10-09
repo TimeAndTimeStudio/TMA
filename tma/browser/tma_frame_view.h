@@ -22,9 +22,9 @@ namespace tma {
 //   * minimize / maximize-restore / close buttons, centred in the strip,
 // and it answers NonClientHitTest() so that WindowEventFilterLinux turns the
 // borders into resize zones and the caption into a drag region. There is no
-// caption text: the strip is chrome for the three controls only, and the
-// window's own title (the page title, see TmaPlatformDelegate::SetTitle) is
-// left to the compositor/taskbar.
+// caption text: the strip is chrome for the three controls only, and TMA sets
+// no window title either (see TmaPlatformDelegate), so there is nothing for
+// the compositor to show on this window's behalf.
 class TmaFrameView : public views::FrameView {
   METADATA_HEADER(TmaFrameView, views::FrameView)
 

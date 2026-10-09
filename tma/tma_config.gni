@@ -1,0 +1,35 @@
+# Owner: Time And Time Studio
+# Date: 2026-10-09 08:50 +0700
+# License: GPL-3.0-or-later
+
+# Application identity for TMA.
+#
+# The values themselves live in //tma.conf, which scripts/setup_chromium.sh
+# reads and appends to GN_ARGS -- so these declare_args() defaults are only a
+# fallback for a bare `gn gen` run without setup. Keep them equal to what
+# tma.conf ships; setup overwrites them on every run, so a mismatch can only
+# survive if someone edits one file and not the other.
+#
+# Everything here is compile-time on purpose. The output binary is named
+# <tma_app_name> and its resource directory is <tma_app_name>_resources, and a
+# process cannot rename its own file by reading a config, so the name has to be
+# decided before the link. The window title and Wayland app_id follow the same
+# values to keep identity consistent across all four places.
+#
+# See //tma/BUILD.gn for where each one lands.
+
+declare_args() {
+  # Output binary name and resource directory prefix. No path separators.
+  tma_app_name = "tma"
+
+  # Wayland xdg_toplevel app_id. Compositors match this against the
+  # Exec= line of a .desktop file, so it should look like a reverse-DNS id
+  # once this is shipped as something other than "tma".
+  tma_app_id = "tma"
+
+  # Startup target when the command line carries no URL or path. Exactly one
+  # of the two should be set; both empty means
+  # <tma_app_name>_resources/index.html next to the executable.
+  tma_startup_file = ""
+  tma_startup_url = ""
+}

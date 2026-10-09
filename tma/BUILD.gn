@@ -4,8 +4,8 @@
 
 # TMA — Time Mini App.
 #
-# This BUILD.gn lives at the root of a Chromium checkout as //tma/BUILD.gn.
-# GN only follows dependency paths out of //BUILD.gn, so scripts/setup_chromium.sh
+# This BUILD.gn lives at the root of a Chromium checkout as //tma/BUILD.gn. GN
+# only follows dependency paths out of //BUILD.gn, so scripts/setup_chromium.sh
 # appends a `group("tma_hook")` to that file to pull this one into the build
 # graph — without it `ninja tma` reports `unknown target 'tma'`.
 #
@@ -20,16 +20,33 @@
 import("//build/config/features.gni")
 import("//build/config/ozone.gni")
 import("//build/config/ui.gni")
+import("//tma/tma_config.gni")
 
 assert(is_linux, "TMA only supports Linux.")
 assert(toolkit_views, "TMA requires the views toolkit (USE_AURA on Linux).")
-assert(
-    ozone_platform_wayland, "TMA requires the Ozone Wayland platform.")
+assert(ozone_platform_wayland, "TMA requires the Ozone Wayland platform.")
+assert(tma_app_name != "", "app_name in tma.conf is empty.")
+
+# The character check (letters, digits, '.', '_', '-') lives in
+# scripts/tma_conf.sh, where it can name the offending value; GN has no string
+# method syntax to express it, so only the empty case is asserted here.
 
 config("tma_warnings") {
   # TMA is embedder code, not Chromium code; keep -Werror off so that future
   # compiler/Wall changes cannot break the out-of-tree build.
   defines = []
+}
+
+# Application identity read from //tma.conf, inlined as preprocessor defines
+# (see //tma/tma_config.gni for why it is build-time). The binary has no other
+# way to learn its own name, so these have to be constants.
+config("tma_identity") {
+  defines = [
+    "TMA_APP_NAME=\"$tma_app_name\"",
+    "TMA_APP_ID=\"$tma_app_id\"",
+    "TMA_STARTUP_FILE=\"$tma_startup_file\"",
+    "TMA_STARTUP_URL=\"$tma_startup_url\"",
+  ]
 }
 
 source_set("tma_shell") {
@@ -59,7 +76,10 @@ source_set("tma_shell") {
     "browser/tma_widget_delegate.h",
   ]
 
-  configs += [ ":tma_warnings" ]
+  configs += [
+    ":tma_identity",
+    ":tma_warnings",
+  ]
 
   deps = [
     "//content/public/app",
@@ -78,8 +98,8 @@ source_set("tma_shell") {
     "//ui/native_theme",
     "//ui/resources",
     "//ui/views",
-    "//ui/views/controls/webview",
     "//ui/views:test_support",
+    "//ui/views/controls/webview",
     "//ui/wm",
     "//url",
   ]
@@ -99,16 +119,25 @@ source_set("tma_shell") {
 
 # Copies the demo/serving HTML next to the built executable so that the shell
 # can load it with a file:// URL without any backend.
+#
+# The target name stays "tma_resources" so existing data_deps references and
+# `autoninja ... tma_resources` keep working; only the directory on disk is
+# named from tma.conf, and TmaBrowserMainParts builds the same name from
+# TMA_APP_NAME at startup.
 copy("tma_resources") {
   testonly = true
 
   sources = [ "resources/index.html" ]
 
-  outputs = [ "$root_out_dir/tma_resources/{{source_file_part}}" ]
+  outputs = [ "$root_out_dir/${tma_app_name}_resources/{{source_file_part}}" ]
 }
 
 executable("tma") {
   testonly = true
+
+  # Only the file on disk follows app_name; the GN target is left as "tma" so
+  # that `autoninja -C <out> tma` and build_tma.sh do not have to know it.
+  output_name = tma_app_name
 
   sources = [ "app/tma_main.cc" ]
 

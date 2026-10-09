@@ -18,7 +18,7 @@
 #   scripts/package_tma.sh [--xz] [output-dir]
 #
 # Arguments:
-#   --xz          also write <output-dir>/tma.xz (xz -9)
+#   --xz          also write <output-dir>/<app_name>.xz (xz -9)
 #   output-dir    default: <this repository>/build
 #
 # Environment:
@@ -33,8 +33,16 @@ die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+source "$SCRIPT_DIR/tma_conf.sh"
+
 CHROMIUM_SRC="${CHROMIUM_SRC:-$HOME/chromium/src}"
 TMA_OUT="${TMA_OUT:-$CHROMIUM_SRC/out/Default}"
+
+# The build produced these names from tma.conf; see //tma/BUILD.gn. Reading the
+# file again here rather than hardcoding "tma" is what keeps a rename from
+# leaving a package full of files under the old name.
+APP="$(tma_conf_name)"
+RES_DIR="${APP}_resources"
 
 do_xz=0
 if [[ "${1:-}" == "--xz" ]]; then
@@ -44,9 +52,9 @@ fi
 
 DIST="${1:-$PROJECT_ROOT/build}"
 
-EXE="$TMA_OUT/tma"
+EXE="$TMA_OUT/$APP"
 PAK="$TMA_OUT/content_shell.pak"
-RES="$TMA_OUT/tma_resources"
+RES="$TMA_OUT/$RES_DIR"
 
 [[ -x "$EXE" ]] || die "$EXE not found; run scripts/build_tma.sh first"
 [[ -f "$PAK" ]] || die "$PAK not found; run scripts/build_tma.sh first"
@@ -59,12 +67,12 @@ bytes() { # bytes <file> -> "12345678 B (117.7 MB)"
 }
 
 mkdir -p "$DIST"
-rm -rf "${DIST:?}/tma_resources"
+rm -rf "${DIST:?}/$RES_DIR"
 
 log "staging -> $DIST"
-cp -f "$EXE"   "$DIST/tma"
+cp -f "$EXE"   "$DIST/$APP"
 cp -f "$PAK"   "$DIST/content_shell.pak"
-cp -a "$RES"   "$DIST/tma_resources"
+cp -a "$RES"   "$DIST/$RES_DIR"
 
 # Runtime files that must sit next to the binary. Chromium resolves them
 # relative to /proc/self/exe, so a staged copy without them dies at startup
@@ -109,30 +117,30 @@ if [[ -f "$TMA_OUT/chrome-sandbox" ]]; then
   chmod 4755 "$DIST/chrome-sandbox"
 fi
 
-raw="$(bytes "$DIST/tma")"
-log "stripping $DIST/tma"
-strip "$DIST/tma"
-stripped="$(bytes "$DIST/tma")"
+raw="$(bytes "$DIST/$APP")"
+log "stripping $DIST/$APP"
+strip "$DIST/$APP"
+stripped="$(bytes "$DIST/$APP")"
 
 log ""
-log "  tma, unstripped   $raw"
-log "  tma, stripped     $stripped"
+log "  $APP, unstripped   $raw"
+log "  $APP, stripped     $stripped"
 log "  runtime files     $staged_runtime (+ locales/ if present)"
 
 if [[ "$do_xz" == 1 ]]; then
   command -v xz >/dev/null || die "xz not found"
-  log "  compressing (xz -9), replaces $DIST/tma ..."
-  xz -9f "$DIST/tma"
-  log "  tma.xz            $(bytes "$DIST/tma.xz")"
+  log "  compressing (xz -9), replaces $DIST/$APP ..."
+  xz -9f "$DIST/$APP"
+  log "  $APP.xz            $(bytes "$DIST/$APP.xz")"
 fi
 
 log ""
 log "  content_shell.pak $(bytes "$DIST/content_shell.pak")"
-log "  tma_resources     $(du -sh --apparent-size "$DIST/tma_resources" | cut -f1)"
+log "  $RES_DIR     $(du -sh --apparent-size "$DIST/$RES_DIR" | cut -f1)"
 log ""
 log "total: $(du -sh --apparent-size "$DIST" | cut -f1) in $DIST"
-if [[ -x "$DIST/tma" ]]; then
-  log "run it with: $DIST/tma   (needs a Wayland session)"
+if [[ -x "$DIST/$APP" ]]; then
+  log "run it with: $DIST/$APP   (needs a Wayland session)"
 else
-  log "unpack first: xz -dk $DIST/tma.xz"
+  log "unpack first: xz -dk $DIST/$APP.xz"
 fi

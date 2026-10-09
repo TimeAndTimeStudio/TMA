@@ -28,16 +28,44 @@ grafts `tma/` into the checkout, compiles, and packages.
 
 The first run is heavy. After that every step is idempotent.
 
-**After editing `./tma/`, run `./build.sh`.** The tree is *copied* into the
-Chromium checkout, so a bare `autoninja` sees stale files.
+**After editing `./tma/` or `./tma.conf`, run `./build.sh`.** The tree is
+*copied* into the Chromium checkout, so a bare `autoninja` sees stale files.
+
+## Configure
+
+`./tma.conf` decides the application's identity and what it opens with:
+
+```ini
+app_name = tma   # the binary, and the <app_name>_resources/ directory beside it
+app_id = tma     # Wayland xdg_toplevel app_id
+startup_file =   # path opened when the command line carries no argument
+startup_url =    # ...or a URL; set at most one of the two
+```
+
+`app_name` and `app_id` must start with a letter or digit and use only
+letters, digits, `.` `_` and `-`.
+
+There is deliberately no window title. The top bar carries the three caption
+buttons and no text, so a page's `<title>` has nowhere to appear and is
+ignored.
+
+The file is read at *setup* time and baked into the binary, so re-run
+`./build.sh` after editing it. A command-line argument always beats the
+configured default:
+
+```bash
+build/tma --url=https://example.com
+build/tma https://example.com
+build/tma /path/to/page.html
+```
 
 ## Where the output goes
 
 | Path | What |
 |---|---|
-| `build/tma` | the binary, stripped |
+| `build/<app_name>` | the binary, stripped |
 | `build/content_shell.pak` | resources |
-| `build/tma_resources/` | the default app page |
+| `build/<app_name>_resources/` | the default app page |
 
 `$HOME/chromium/src/out/Default` keeps the unstripped build (273 MB). `build/`
 is the shippable copy (146 MB) — copy the whole directory.
@@ -45,7 +73,7 @@ is the shippable copy (146 MB) — copy the whole directory.
 ## Run
 
 ```bash
-build/tma
+build/<app_name>
 ```
 
 Needs a Wayland session. If your shell has no `WAYLAND_DISPLAY`, prefix
@@ -56,6 +84,7 @@ Needs a Wayland session. If your shell has no `WAYLAND_DISPLAY`, prefix
 ```
 CHROMIUM_VERSION    the Chromium tag TMA builds against
 build.sh            the whole workflow
+tma.conf            application name, id and startup target
 tma/browser/        the frame: hit-test, caption buttons, strip
 tma/app/            process entry point
 tma/resources/      the default application page

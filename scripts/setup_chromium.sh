@@ -504,6 +504,48 @@ disable_fieldtrial_testing_config = false
 EOF
 )
 
+# --- application identity from tma.conf --------------------------------------
+# tma.conf is the one place app_name / app_id / startup target are written down.
+# They are turned into GN arguments here rather than read
+# from inside //tma/BUILD.gn because the checkout is a copy of this repo made
+# at setup time, so a config-only edit has to reach this gn gen invocation to
+# have any effect at all.
+source "$SCRIPT_DIR/tma_conf.sh"
+
+_tma_app_name="$(tma_conf_get app_name)" || _tma_app_name=""
+_tma_app_id="$(tma_conf_get app_id)" || _tma_app_id=""
+_tma_startup_file="$(tma_conf_get startup_file)" || _tma_startup_file=""
+_tma_startup_url="$(tma_conf_get startup_url)" || _tma_startup_url=""
+
+# A missing value falls back to the stock identity, but a present value that is
+# not usable dies here. app_name becomes an output path and is also spliced
+# into the percent-encoded fallback page, so substituting a name silently would
+# resurface much later as a missing file instead of as its cause.
+if [[ -z "$_tma_app_name" ]]; then
+  _tma_app_name="tma"
+elif ! tma_conf_valid_name "$_tma_app_name"; then
+  die "tma.conf: app_name '$_tma_app_name' must start with a letter or digit and use only letters, digits, '.', '_' and '-'"
+fi
+
+[[ -n "$_tma_app_id" ]] || _tma_app_id="$_tma_app_name"
+if ! tma_conf_valid_name "$_tma_app_id"; then
+  die "tma.conf: app_id '$_tma_app_id' must start with a letter or digit and use only letters, digits, '.', '_' and '-'"
+fi
+
+if [[ -n "$_tma_startup_file" && -n "$_tma_startup_url" ]]; then
+  die "tma.conf: set startup_file or startup_url, not both"
+fi
+
+log "identity: app_name=$_tma_app_name app_id=$_tma_app_id"
+log "startup:  file=${_tma_startup_file:-<default>} url=${_tma_startup_url:-<default>}"
+
+GN_ARGS="$GN_ARGS
+tma_app_name = \"$(tma_conf_gn_escape "$_tma_app_name")\"
+tma_app_id = \"$(tma_conf_gn_escape "$_tma_app_id")\"
+tma_startup_file = \"$(tma_conf_gn_escape "$_tma_startup_file")\"
+tma_startup_url = \"$(tma_conf_gn_escape "$_tma_startup_url")\"
+"
+
 log "gn gen $TMA_OUT"
 # Run from inside src/, not from the TMA tree: depot_tools' gn shim resolves
 # buildtools/linux64/gn relative to the solution directory, and from outside

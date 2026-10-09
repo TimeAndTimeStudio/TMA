@@ -51,6 +51,16 @@ class TmaPlatformDelegate : public content::ShellPlatformDelegate {
                        bool is_enabled) override;
   void SetAddressBarURL(content::Shell* shell, const GURL& url) override;
   void SetIsLoading(content::Shell* shell, bool loading) override;
+  // Empty on purpose, but it must stay an override. TMA builds with
+  // toolkit_views, so content shell's base implementation is the one in
+  // //content/shell/browser/shell_platform_delegate_views.cc, and that one does
+  //   shell_data_map_[shell].window_widget->widget_delegate()->SetTitle(...)
+  // against content::ShellPlatformDelegate's own per-shell map. TMA keeps that
+  // state in |shell_data_map_| below instead and never fills the base class's,
+  // so inheriting the base version default-inserts an entry, reads a null
+  // widget, and crashes on the first page title update. Doing nothing with
+  // |title| is also the intent: TmaFrameView draws no caption text and there is
+  // no title bar for a title to appear in. See tma_frame_view.h.
   void SetTitle(content::Shell* shell, const std::u16string& title) override;
   bool DestroyShell(content::Shell* shell) override;
 

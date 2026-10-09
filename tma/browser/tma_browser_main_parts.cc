@@ -34,7 +34,13 @@ namespace {
 
 constexpr char kUrlSwitch[] = "url";
 constexpr char kWindowSizeSwitch[] = "window-size";
-constexpr char kResourcesDirName[] = "tma_resources";
+
+// Spliced together by string-literal concatenation from TMA_APP_NAME, so that
+// renaming the app in tma.conf moves the directory TMA looks in as well;
+// //tma/BUILD.gn copies the HTML into a directory named the same way. tma.conf
+// restricts app_name to ASCII characters that need no percent-encoding, which
+// is what makes it safe to splice into the fallback URL below too.
+constexpr char kResourcesDirName[] = TMA_APP_NAME "_resources";
 constexpr char kEntryFileName[] = "index.html";
 
 // Percent-encoded fallback page, used only when the packaged resources cannot
@@ -42,13 +48,15 @@ constexpr char kEntryFileName[] = "index.html";
 constexpr char kMissingResourcesUrl[] =
     "data:text/html;charset=utf-8,"
     "%3C!doctype%20html%3E%3Cmeta%20charset%3Dutf-8%3E"
-    "%3Ctitle%3ETMA%3C%2Ftitle%3E"
+    "%3Ctitle%3E" TMA_APP_NAME "%3C%2Ftitle%3E"
     "%3Cbody%20style%3D%22font%3A16px%20system-ui%2Csans-serif%3B"
     "margin%3A4rem%2Ccolor%3A%23444%22%3E"
-    "%3Ch1%3ETMA%3C%2Fh1%3E"
+    "%3Ch1%3E" TMA_APP_NAME "%3C%2Fh1%3E"
     "%3Cp%3ENo%20resources%20found.%20Expected%20"
-    "%22tma_resources%2Findex.html%22%20next%20to%20the%20executable%2C"
-    "%20or%20pass%20a%20URL%20on%20the%20command%20line.%3C%2Fp%3E"
+    "%22" TMA_APP_NAME
+    "_resources%2Findex.html%22%20next%20to%20the%20executable%2C"
+    "%20or%20pass%20a%20URL%20on%20the%20command%20line%2C%20or%20set%20"
+    "startup_file%20or%20startup_url%20in%20tma.conf.%3C%2Fp%3E"
     "%3C%2Fbody%3E";
 
 // Content shell registers a resource provider so that net/ can look up
@@ -128,7 +136,35 @@ GURL TmaBrowserMainParts::GetStartupURL() const {
   }
 
   base::FilePath exe_dir;
-  if (base::PathService::Get(base::DIR_EXE, &exe_dir)) {
+  base::PathService::Get(base::DIR_EXE, &exe_dir);
+
+  // startup_url / startup_file from tma.conf, compiled in by //tma/BUILD.gn.
+  // These sit below the command line on purpose: an argument on a given launch
+  // is a more specific statement of intent than a default recorded once at
+  // build time. setup_chromium.sh refuses a config that sets both.
+  if (TMA_STARTUP_URL[0] != '\0') {
+    const GURL url(TMA_STARTUP_URL);
+    if (url.is_valid() && url.has_scheme()) {
+      return url;
+    }
+    LOG(WARNING) << "tma.conf startup_url is not a usable URL: "
+                 << TMA_STARTUP_URL;
+  }
+  if (TMA_STARTUP_FILE[0] != '\0') {
+    // A relative path is taken against the executable's directory rather than
+    // the working directory, because a working directory depends on where the
+    // binary happened to be launched from.
+    base::FilePath path(TMA_STARTUP_FILE);
+    if (!path.IsAbsolute() && !exe_dir.empty()) {
+      path = exe_dir.Append(path);
+    }
+    if (base::PathExists(path)) {
+      return net::FilePathToFileURL(path);
+    }
+    LOG(WARNING) << "tma.conf startup_file does not exist: " << path.value();
+  }
+
+  if (!exe_dir.empty()) {
     const base::FilePath entry =
         exe_dir.AppendASCII(kResourcesDirName).AppendASCII(kEntryFileName);
     if (base::PathExists(entry)) {

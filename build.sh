@@ -32,6 +32,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+source "$SCRIPT_DIR/scripts/tma_conf.sh"
+
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
 # Where the build lands.  Kept in sync with TMA_OUT / CHROMIUM_SRC below.
@@ -41,11 +43,13 @@ out_dir() { printf '%s' "${TMA_OUT:-${CHROMIUM_SRC:-$HOME/chromium/src}/out/Defa
 stage_dir() { printf '%s' "$SCRIPT_DIR/build"; }
 
 report() {
-  local out pkg exe res
+  local out pkg app res_dir exe res
   out="$(out_dir)"
   pkg="$(stage_dir)"
-  exe="$out/tma"
-  res="$out/tma_resources"
+  app="$(tma_conf_name)"
+  res_dir="${app}_resources"
+  exe="$out/$app"
+  res="$out/$res_dir"
 
   printf '\n\033[1mdone\033[0m\n\n'
   if [[ ! -x "$exe" ]]; then
@@ -59,16 +63,16 @@ report() {
   printf '  size       %s\n' "$(du -h --apparent-size "$exe" | cut -f1)"
 
   printf '\n  packaged   %s\n' "$pkg"
-  if [[ -x "$pkg/tma" ]]; then
-    printf '    tma          %s (stripped)\n' "$(du -h --apparent-size "$pkg/tma" | cut -f1)"
-    [[ -f "$pkg/tma.xz" ]] && printf '    tma.xz       %s\n' "$(du -h --apparent-size "$pkg/tma.xz" | cut -f1)"
-    printf '    content_shell.pak  %s\n' "$(du -h --apparent-size "$pkg/content_shell.pak" | cut -f1)"
-    printf '    total        %s\n' "$(du -sh --apparent-size "$pkg" | cut -f1)"
+  if [[ -x "$pkg/$app" ]]; then
+    printf '    %-17s %s (stripped)\n' "$app" "$(du -h --apparent-size "$pkg/$app" | cut -f1)"
+    [[ -f "$pkg/$app.xz" ]] && printf '    %-17s %s\n' "$app.xz" "$(du -h --apparent-size "$pkg/$app.xz" | cut -f1)"
+    printf '    %-17s %s\n' "content_shell.pak" "$(du -h --apparent-size "$pkg/content_shell.pak" | cut -f1)"
+    printf '    %-17s %s\n' "total" "$(du -sh --apparent-size "$pkg" | cut -f1)"
   fi
 
   printf '\nrun it with:\n'
-  if [[ -x "$pkg/tma" ]]; then
-    printf '  %q\n' "$pkg/tma"
+  if [[ -x "$pkg/$app" ]]; then
+    printf '  %q\n' "$pkg/$app"
   else
     printf '  %q\n' "$exe"
   fi

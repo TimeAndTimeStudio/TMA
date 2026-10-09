@@ -75,7 +75,8 @@ void TmaPlatformDelegate::CreatePlatformWindow(
   // honour the HTCAPTION / HTLEFT / ... results produced by TmaFrameView
   // (caption drag, border resize, double-click-to-maximize).
   widget_delegate->SetHasWindowSizeControls(true);
-  widget_delegate->SetTitle(u"TMA");
+  // No SetTitle(): TMA's window carries no title at all. That is not the same
+  // as having no SetTitle() override -- see SetTitle() further down.
   // Deliberately not calling SetOwnedByWidget(): that pass key is only
   // constructible by friends of views::WidgetDelegate. TmaShellData owns the
   // delegate instead.
@@ -93,7 +94,7 @@ void TmaPlatformDelegate::CreatePlatformWindow(
   // wm_class_name / wm_class_class pair is deliberately not set: its only
   // reader is ui/ozone/platform/x11/x11_window.cc:417, and this build has
   // ozone_platform_x11 off, so nothing would ever pick the value up.
-  params.wayland_app_id = "tma";
+  params.wayland_app_id = TMA_APP_ID;
 
   shell_data.window_widget->Init(std::move(params));
 }
@@ -157,12 +158,10 @@ void TmaPlatformDelegate::SetAddressBarURL(content::Shell* shell,
 
 void TmaPlatformDelegate::SetIsLoading(content::Shell* shell, bool loading) {}
 
+// Empty, but overriding it is load-bearing: the content shell base class
+// dereferences a per-shell map TMA never populates. See the declaration.
 void TmaPlatformDelegate::SetTitle(content::Shell* shell,
-                                   const std::u16string& title) {
-  // Updates the native window title (task switcher / Alt-Tab). The visible
-  // caption text stays "TMA" by design; see TmaFrameView.
-  GetShellData(shell).window_widget->widget_delegate()->SetTitle(title);
-}
+                                   const std::u16string& title) {}
 
 bool TmaPlatformDelegate::DestroyShell(content::Shell* shell) {
   TmaShellData& shell_data = GetShellData(shell);

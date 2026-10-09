@@ -17,7 +17,7 @@
 #   scripts/setup_chromium.sh   git, gclient, gn     (last two from depot_tools)
 #   scripts/build_tma.sh        autoninja            (from depot_tools)
 #   scripts/package_tma.sh      strip                (from binutils)
-#   scripts/run_tma.sh          nothing -- it only execs build/tma
+#   scripts/run_tma.sh          nothing -- it only execs build/<app_name>
 #
 # gclient, gn and autoninja ship with depot_tools, which setup_chromium.sh
 # installs itself, so no Fedora package provides them. That leaves git and
@@ -97,7 +97,7 @@ REQUIRED=(
 #     git      ./build.sh setup    fails at "Pinning Chromium" --
 #                                  "BLOCKED: git called unexpectedly",
 #                                  "no such Chromium tag"
-#     binutils ./build.sh package  fails at "stripping <dist>/tma"
+#     binutils ./build.sh package  fails at "stripping <dist>/<app_name>"
 #
 #   DROPPED (setup succeeded and the build finished 905 steps with 0 failures
 #   and 0 BLOCKED lines, so none of these is ever invoked)
