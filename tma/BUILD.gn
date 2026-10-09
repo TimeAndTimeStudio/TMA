@@ -1,0 +1,119 @@
+# Copyright 2026 The TMA Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# TMA — Time Mini App.
+#
+# This BUILD.gn lives at the root of a Chromium checkout as //tma/BUILD.gn.
+# GN only follows dependency paths out of //BUILD.gn, so scripts/setup_chromium.sh
+# appends a `group("tma_hook")` to that file to pull this one into the build
+# graph — without it `ninja tma` reports `unknown target 'tma'`. See README.md §5
+# for the full list of places setup touches.
+#
+# The resource bundle is NOT defined here: the embedder loads whatever sits at
+# `content_shell.pak` (//content/shell/app/shell_main_delegate.cc:400,422) and
+# GN refuses two targets with the same output, so TMA's trimmed file list lives
+# in //tma/tma_pak.gni and setup injects it into the existing repack in
+# //content/shell/BUILD.gn instead of adding a second producer.
+#
+#   autoninja -C out/Default tma
+
+import("//build/config/ozone.gni")
+import("//build/config/ui.gni")
+
+assert(is_linux, "TMA only supports Linux.")
+assert(toolkit_views, "TMA requires the views toolkit (USE_AURA on Linux).")
+assert(
+    ozone_platform_wayland, "TMA requires the Ozone Wayland platform.")
+
+config("tma_warnings") {
+  # TMA is embedder code, not Chromium code; keep -Werror off so that future
+  # compiler/Wall changes cannot break the out-of-tree build.
+  defines = []
+}
+
+source_set("tma_shell") {
+  testonly = true
+
+  sources = [
+    "app/tma_main_delegate.cc",
+    "app/tma_main_delegate.h",
+    "browser/tma_browser_main_parts.cc",
+    "browser/tma_browser_main_parts.h",
+    "browser/tma_caption_button.cc",
+    "browser/tma_caption_button.h",
+    "browser/tma_content_browser_client.cc",
+    "browser/tma_content_browser_client.h",
+    "browser/tma_frame_view.cc",
+    "browser/tma_frame_view.h",
+    "browser/tma_fullscreen.cc",
+    "browser/tma_fullscreen.h",
+    "browser/tma_metrics.h",
+    "browser/tma_platform_delegate.cc",
+    "browser/tma_platform_delegate.h",
+    "browser/tma_view.cc",
+    "browser/tma_view.h",
+    "browser/tma_widget_delegate.cc",
+    "browser/tma_widget_delegate.h",
+  ]
+
+  configs += [ ":tma_warnings" ]
+
+  deps = [
+    "//content/public/app",
+    "//content/public/browser",
+    "//content/public/common",
+    "//content/shell:content_shell_lib",
+    "//net",
+    "//net:net_resources",
+    "//third_party/abseil-cpp:absl",
+    "//ui/aura",
+    "//ui/base",
+    "//ui/color:color_headers",
+    "//ui/display",
+    "//ui/events",
+    "//ui/gfx",
+    "//ui/resources",
+    "//ui/views",
+    "//ui/views/controls/webview",
+    "//ui/views:test_support",
+    "//ui/wm",
+    "//url",
+  ]
+}
+
+# Copies the demo/serving HTML next to the built executable so that the shell
+# can load it with a file:// URL without any backend.
+copy("tma_resources") {
+  testonly = true
+
+  sources = [ "resources/index.html" ]
+
+  outputs = [ "$root_out_dir/tma_resources/{{source_file_part}}" ]
+}
+
+executable("tma") {
+  testonly = true
+
+  sources = [ "app/tma_main.cc" ]
+
+  deps = [
+    ":tma_shell",
+    "//content/public/app",
+    "//content/shell:content_shell_app",
+    "//content/shell:content_shell_lib",
+    "//content/shell:pak",
+    "//sandbox",
+  ]
+
+  data_deps = [
+    ":tma_resources",
+    "//components/crash/core/app:chrome_crashpad_handler",
+    "//content/shell:pak",
+    "//tools/v8_context_snapshot",
+  ]
+
+  if (!is_component_build) {
+    configs += [ "//build/config/gcc:rpath_for_built_shared_libraries" ]
+  }
+}

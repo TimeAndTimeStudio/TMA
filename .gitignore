@@ -1,0 +1,9 @@
+# OS / editor
+.DS_Store
+*.swp
+*~
+
+# local build staging (build output lives in $CHROMIUM_SRC/out, not here)
+out/
+dist/
+*.tar.xz

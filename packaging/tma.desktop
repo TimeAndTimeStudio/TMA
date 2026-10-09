@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=TMA
+GenericName=Time Mini App
+Comment=Wayland display shell for the TMA time app
+Exec=tma %U
+Icon=tma
+Terminal=false
+Categories=Utility;Clock;
+Keywords=clock;time;kiosk;display;
+StartupNotify=true
+StartupWMClass=tma

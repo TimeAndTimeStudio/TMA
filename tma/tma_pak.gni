@@ -1,0 +1,73 @@
+# Copyright 2026 The TMA Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Resource list for the `content_shell.pak` that TMA ships.
+#
+# The embedder always loads `content_shell.pak` from next to the executable
+# (//content/shell/app/shell_main_delegate.cc:400,422), and GN rejects two
+# targets with the same output, so TMA cannot define its own repack. Instead
+# scripts/setup_chromium.sh injects the two assignments below into the existing
+# repack("pak") in //content/shell/BUILD.gn; assigning `sources`/`deps` after
+# the original list has been accumulated replaces it wholesale, so the edit is
+# a single anchored insertion rather than a set of deletions.
+#
+# Dropped from //content/shell/BUILD.gn's own list — pages TMA can never reach
+# and must not carry onto an end-user device:
+#
+#   content/browser/devtools/devtools_resources.pak   DevTools front-end
+#   .../inspector_overlay_resources.pak               "Inspect element" overlay
+#   content/test/web_ui_mojo_test_resources.pak       test-only fixtures
+#   media_internals / webrtc_internals / quota_internals
+#   histograms / ukm / traces_internals / tracing_*   chrome:// internals pages
+#   base/tracing/protos/*                             trace recording UI
+#   webxr_internals                                   VR internals page
+#
+# Every remaining source is still produced by a dep kept from the original
+# list, so the repack inputs all resolve.
+
+tma_pak_sources = [
+  "$root_gen_dir/content/content_resources.pak",
+  "$root_gen_dir/content/gpu_resources.pak",
+  "$root_gen_dir/content/process_resources.pak",
+  "$root_gen_dir/content/service_worker_resources.pak",
+  "$root_gen_dir/content/shell/shell_resources.pak",
+  "$root_gen_dir/mojo/public/js/mojo_bindings_resources.pak",
+  "$root_gen_dir/net/net_resources.pak",
+  "$root_gen_dir/third_party/blink/public/resources/blink_resources.pak",
+  "$root_gen_dir/third_party/blink/public/resources/blink_scaled_resources_100_percent.pak",
+  "$root_gen_dir/third_party/blink/public/strings/blink_strings_en-US.pak",
+  "$root_gen_dir/third_party/blink/public/strings/permission_element_generated_strings.pak",
+  "$root_gen_dir/third_party/blink/public/strings/permission_element_strings_en-US.pak",
+  "$root_gen_dir/ui/resources/ui_lottie_resources.pak",
+  "$root_gen_dir/ui/resources/ui_resources_100_percent.pak",
+  "$root_gen_dir/ui/strings/app_locale_settings_en-US.pak",
+  "$root_gen_dir/ui/strings/auto_image_annotation_strings_en-US.pak",
+  "$root_gen_dir/ui/strings/ax_strings_en-US.pak",
+  "$root_gen_dir/ui/strings/ui_strings_en-US.pak",
+  "$root_gen_dir/ui/webui/resources/webui_resources.pak",
+]
+
+tma_pak_deps = [
+  "//content:content_resources",
+  "//content/browser/resources",
+  "//content/shell:resources",
+  "//mojo/public/js:resources",
+  "//net:net_resources",
+  "//third_party/blink/public:resources",
+  "//third_party/blink/public:scaled_resources_100_percent",
+  "//third_party/blink/public/strings",
+  "//third_party/blink/public/strings:permission_element_generated_strings",
+  "//third_party/blink/public/strings:permission_element_strings",
+  "//ui/resources",
+  "//ui/strings",
+  "//ui/webui/resources",
+]
+
+# Mirrors `shell_use_toolkit_views` in //content/shell/BUILD.gn:46. TMA asserts
+# toolkit_views on Linux, so the views strings are always part of the pack.
+tma_pak_sources += [
+  "$root_gen_dir/ui/views/resources/views_resources_100_percent.pak",
+]
+
+tma_pak_deps += [ "//ui/views/resources" ]

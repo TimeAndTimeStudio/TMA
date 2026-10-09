@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TMA</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9;
+    --fg: #1c1d21;
+    --muted: #5f6368;
+    --card: #ffffff;
+    --line: #d7dade;
+    --accent: #1a73e8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1c1f;
+      --fg: #e7e9ee;
+      --muted: #a5abb5;
+      --card: #24262b;
+      --line: #3a3d44;
+      --accent: #7ab0ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+  }
+  main {
+    width: min(720px, 100%);
+    display: grid;
+    gap: 20px;
+  }
+  .clock {
+    text-align: center;
+    padding: 28px 24px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+  .clock time {
+    display: block;
+    font-size: clamp(2.6rem, 9vw, 4.4rem);
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+    letter-spacing: .02em;
+  }
+  .clock .date { color: var(--muted); }
+  section {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px;
+  }
+  h2 {
+    margin: 0 0 4px;
+    font-size: 1.05rem;
+  }
+  p.hint {
+    margin: 0 0 14px;
+    color: var(--muted);
+    font-size: .9rem;
+  }
+  form { display: flex; gap: 8px; flex-wrap: wrap; }
+  input, textarea, button {
+    font: inherit;
+    color: var(--fg);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  input { flex: 1 1 240px; min-width: 0; }
+  textarea { width: 100%; min-height: 96px; resize: vertical; font-family: ui-monospace, monospace; }
+  button { cursor: pointer; background: var(--accent); border-color: transparent; color: #fff; }
+  button.secondary { background: transparent; border-color: var(--line); color: var(--fg); }
+  pre {
+    margin: 12px 0 0;
+    padding: 10px;
+    max-height: 220px;
+    overflow: auto;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font: 12px/1.5 ui-monospace, monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .status { color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<main>
+  <div class="clock">
+    <time id="time" datetime="">--:--:--</time>
+    <div class="date" id="date">&nbsp;</div>
+  </div>
+
+  <section>
+    <h2>GET</h2>
+    <p class="hint">TMA has no backend: the page fetches whatever URL you give it, from JS.</p>
+    <form id="get-form">
+      <input id="get-url" type="url" placeholder="https://example.com/api" required>
+      <button type="submit">Fetch</button>
+    </form>
+    <pre id="get-out">Ready.</pre>
+  </section>
+
+  <section>
+    <h2>WebSocket</h2>
+    <p class="hint">Connect to any endpoint; frames are echoed below.</p>
+    <form id="ws-form">
+      <input id="ws-url" type="text" placeholder="wss://echo.websocket.events" required>
+      <button type="submit" id="ws-connect">Connect</button>
+      <button type="button" class="secondary" id="ws-close" disabled>Close</button>
+    </form>
+    <div class="row" style="margin-top:8px">
+      <input id="ws-msg" type="text" placeholder="message" disabled>
+      <button type="button" id="ws-send" disabled>Send</button>
+      <span class="status" id="ws-status">disconnected</span>
+    </div>
+    <pre id="ws-out"></pre>
+  </section>
+
+  <section>
+    <h2>Window</h2>
+    <p class="hint">
+      F11 toggles <em>native</em> window fullscreen (the TMA frame is dropped
+      entirely). Drag the top bar to move the window, drag a window edge to
+      resize. The button below requests HTML5 fullscreen, which TMA maps onto
+      the same native fullscreen.
+    </p>
+    <div class="row">
+      <button type="button" class="secondary" id="btn-fullscreen">Fullscreen</button>
+      <span class="status" id="win-status"></span>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+const timeEl = document.getElementById("time");
+const dateEl = document.getElementById("date");
+const dateFormatter = new Intl.DateTimeFormat(undefined, {
+  weekday: "long", year: "numeric", month: "long", day: "numeric",
+});
+
+function tick() {
+  const now = new Date();
+  timeEl.textContent = now.toLocaleTimeString();
+  timeEl.dateTime = now.toISOString();
+  dateEl.textContent = dateFormatter.format(now);
+}
+tick();
+setInterval(tick, 250);
+
+// ---- GET ------------------------------------------------------------------
+const getForm = document.getElementById("get-form");
+const getOut = document.getElementById("get-out");
+
+getForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const url = document.getElementById("get-url").value;
+  getOut.textContent = "GET " + url + "\n…";
+  try {
+    const started = performance.now();
+    const response = await fetch(url, { headers: { "accept": "*/*" } });
+    const body = await response.text();
+    const elapsed = Math.round(performance.now() - started);
+    getOut.textContent =
+      response.status + " " + response.statusText + "  (" + elapsed + " ms)\n" +
+      [...response.headers.entries()].map(([k, v]) => k + ": " + v).join("\n") +
+      "\n\n" + body.slice(0, 8000);
+  } catch (error) {
+    getOut.textContent = String(error);
+  }
+});
+
+// ---- WebSocket ------------------------------------------------------------
+const wsForm = document.getElementById("ws-form");
+const wsUrl = document.getElementById("ws-url");
+const wsConnect = document.getElementById("ws-connect");
+const wsClose = document.getElementById("ws-close");
+const wsMsg = document.getElementById("ws-msg");
+const wsSend = document.getElementById("ws-send");
+const wsStatus = document.getElementById("ws-status");
+const wsOut = document.getElementById("ws-out");
+
+let socket = null;
+
+function log(line) {
+  wsOut.textContent += line + "\n";
+  wsOut.scrollTop = wsOut.scrollHeight;
+}
+
+function setConnected(connected) {
+  wsConnect.disabled = connected;
+  wsClose.disabled = !connected;
+  wsMsg.disabled = !connected;
+  wsSend.disabled = !connected;
+}
+
+wsForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (socket) return;
+  try {
+    socket = new WebSocket(wsUrl.value);
+  } catch (error) {
+    log("error: " + error);
+    return;
+  }
+  socket.addEventListener("open", () => {
+    wsStatus.textContent = "connected";
+    setConnected(true);
+    log("connected " + wsUrl.value);
+  });
+  socket.addEventListener("message", (event) => log("< " + event.data));
+  socket.addEventListener("error", () => log("socket error"));
+  socket.addEventListener("close", (event) => {
+    wsStatus.textContent = "disconnected (" + event.code + ")";
+    setConnected(false);
+    socket = null;
+    log("closed");
+  });
+});
+
+wsClose.addEventListener("click", () => {
+  if (socket) socket.close(1000, "user request");
+});
+
+function sendMessage() {
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+  socket.send(wsMsg.value);
+  log("> " + wsMsg.value);
+  wsMsg.value = "";
+}
+wsSend.addEventListener("click", sendMessage);
+wsMsg.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") { event.preventDefault(); sendMessage(); }
+});
+
+// ---- window ---------------------------------------------------------------
+const winStatus = document.getElementById("win-status");
+document.getElementById("btn-fullscreen").addEventListener("click", () => {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
+});
+document.addEventListener("fullscreenchange", () => {
+  winStatus.textContent = document.fullscreenElement ? "fullscreen" : "";
+});
+</script>
+</body>
+</html>
