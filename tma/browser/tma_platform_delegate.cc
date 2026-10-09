@@ -8,8 +8,10 @@
 
 #include "base/check.h"
 #include "base/command_line.h"
+#include "content/public/browser/file_select_listener.h"
 #include "content/public/browser/web_contents.h"
 #include "content/shell/browser/shell.h"
+#include "content/shell/browser/shell_file_select_helper.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "tma/browser/tma_view.h"
 #include "tma/browser/tma_widget_delegate.h"
@@ -171,6 +173,14 @@ bool TmaPlatformDelegate::DestroyShell(content::Shell* shell) {
   shell_data.fullscreen_observer.reset();
   shell_data.window_widget->CloseNow();
   return true;
+}
+
+void TmaPlatformDelegate::RunFileChooser(
+    content::RenderFrameHost* render_frame_host,
+    scoped_refptr<content::FileSelectListener> listener,
+    const blink::mojom::FileChooserParams& params) {
+  content::ShellFileSelectHelper::RunFileChooser(render_frame_host,
+                                                 std::move(listener), params);
 }
 
 TmaPlatformDelegate::TmaShellData& TmaPlatformDelegate::GetShellData(

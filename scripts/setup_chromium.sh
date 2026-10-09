@@ -198,6 +198,50 @@ open(path, "w", encoding="utf-8").write(text)
 PY
 fi
 
+# --- compile ShellFileSelectHelper on Linux ---------------------------------
+# content shell has no file chooser on Linux. Shell::RunFileChooser hands off
+# to ShellPlatformDelegate::RunFileChooser, whose generic implementation just
+# calls listener->FileSelectionCanceled()
+# (//content/shell/browser/shell_platform_delegate.cc:51), so <input
+# type="file"> opened nothing at all until TmaPlatformDelegate started routing
+# it through ShellFileSelectHelper.
+#
+# The helper itself is platform-agnostic -- no IS_IOS, IS_MAC, UIKit or Cocoa
+# anywhere in it -- and it sits under `if (is_ios)` only because
+# shell_platform_delegate_ios.mm:741 is its one caller upstream. Adding it to
+# the shared list does not collide with that block, which GN never evaluates
+# for a Linux build.
+#
+# The dialog it drives lands on ui::SelectFileDialogLinuxPortal through
+# //ui/shell_dialogs/shell_dialog_linux.cc under BUILDFLAG(USE_DBUS), the same
+# freedesktop portal TMA already reads the desktop color scheme from.
+FILESEL_MARK="# --- TMA compiles ShellFileSelectHelper (added by scripts/setup_chromium.sh) ---"
+if grep -qF "$FILESEL_MARK" "$SHELL_BUILD"; then
+  log "//content/shell:BUILD.gn already compiles ShellFileSelectHelper"
+else
+  log "Compiling content/shell's ShellFileSelectHelper on Linux"
+  python3 - "$SHELL_BUILD" "$FILESEL_MARK" <<'PY'
+import sys
+
+path, mark = sys.argv[1], sys.argv[2]
+text = open(path, encoding="utf-8").read()
+
+anchor = '    "browser/shell_platform_delegate.h",'
+if text.count(anchor) != 1:
+    sys.exit("setup: file-select anchor count is %d in %s"
+             % (text.count(anchor), path))
+
+helper = (
+    "    " + mark + "\n"
+    '    "browser/shell_file_select_helper.cc",\n'
+    '    "browser/shell_file_select_helper.h",\n'
+)
+text = text.replace(anchor, helper + anchor, 1)
+
+open(path, "w", encoding="utf-8").write(text)
+PY
+fi
+
 # --- generate ---------------------------------------------------------------
 # Wayland-only: Ozone is narrowed down to the Wayland platform so that TMA
 # cannot silently fall back to X11 or the headless platform.

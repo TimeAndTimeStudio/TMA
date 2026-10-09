@@ -54,6 +54,17 @@ class TmaPlatformDelegate : public content::ShellPlatformDelegate {
   void SetTitle(content::Shell* shell, const std::u16string& title) override;
   bool DestroyShell(content::Shell* shell) override;
 
+  // content::ShellPlatformDelegate:
+  //
+  // content shell's Linux build answers this by cancelling immediately
+  // (//content/shell/browser/shell_platform_delegate.cc:51), so
+  // <input type="file"> did nothing until TMA routed it through
+  // ShellFileSelectHelper, which drives ui::SelectFileDialog and therefore
+  // the freedesktop portal backend (//ui/shell_dialogs/shell_dialog_linux.cc).
+  void RunFileChooser(content::RenderFrameHost* render_frame_host,
+                      scoped_refptr<content::FileSelectListener> listener,
+                      const blink::mojom::FileChooserParams& params) override;
+
  private:
   // Per-window state. TMA has one Shell per window, like content shell.
   struct TmaShellData {
