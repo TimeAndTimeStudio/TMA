@@ -79,14 +79,10 @@ document, and the binary inside it is `<out>/tma`. The directory holding
 `packaged` is this repository's own **`build/`**, gitignored, and is what you
 copy onto another machine.
 
-To start it, use the launcher — it is executable, so double-click `tma.sh`:
-
-```bash
-./tma.sh
-```
-
 Run it, and you get a window showing a live clock plus a demo page that
-exercises `fetch()` and `WebSocket` — see [§2](#2-using-tma).
+exercises `fetch()` and `WebSocket` — see [§2](#2-using-tma). A terminal
+opened inside a Wayland session already has `WAYLAND_DISPLAY` set; if yours
+does not, prefix the command with `env WAYLAND_DISPLAY=wayland-0`.
 
 ---
 
@@ -433,7 +429,7 @@ scripts in `scripts/`, and it runs them in order every time:
 | 1 | `scripts/install_deps.sh` | probe and install the missing Fedora packages | skips `sudo` when nothing is missing |
 | 2 | `scripts/setup_chromium.sh` | depot_tools → fetch → **pin to `CHROMIUM_VERSION`** → `gclient sync` → graft `tma/` → hook `//tma` into the root `BUILD.gn` → trim the resource pack → `gn gen` | no-op once on the tag |
 | 3 | `scripts/build_tma.sh` | `autoninja -C out/Default tma` | incremental, ~40–50 s |
-| 4 | `scripts/package_tma.sh` | copy the binary, the `.pak` and `tma_resources/` into this repository's `build/` directory, then `strip` the copy | a few seconds (274 MB copy + strip) |
+| 4 | `scripts/package_tma.sh` | copy the binary, the `.pak`, `tma_resources/` and the runtime files Chromium must find next to its binary into this repository's `build/` directory, then `strip` the copy | a few seconds (274 MB copy + strip) |
 
 Each script's own header comment documents its internal flags, for the rare case
 you need one. Nothing in this README depends on them.
@@ -544,9 +540,8 @@ files Chromium must find next to its binary (`icudtl.dat`, `snapshot_blob.bin`,
 Those runtime files are not optional decoration: Chromium resolves them
 relative to `/proc/self/exe`, so a staged copy without `icudtl.dat` dies with
 `Invalid file descriptor to ICU data received`, and without `snapshot_blob.bin`
-with `Error loading V8 startup snapshot file` followed by a dead zygote. Copy
-the whole `build/` directory to another machine and run `./tma.sh` from a
-Wayland session.
+with `Error loading V8 startup snapshot file` followed by a dead zygote. Copy the whole `build/` directory to another machine and run
+`build/tma` from a Wayland session.
 
 To also compress the binary, or to stage somewhere else, run the script
 directly:
@@ -585,10 +580,8 @@ A checkout build puts an un-setuid `chrome-sandbox` (mode `644`) next to the
 binary, which is why so many instructions tell you to add `--no-sandbox`. But
 that is fixing the wrong thing: the helper being *wrong* is not the same as the
 helper being *needed*. On a Fedora Wayland session the namespace sandbox works,
-so TMA runs **sandboxed by default** and the flag is unnecessary.
-
-`./tma.sh` implements exactly the rule above — it adds `--no-sandbox` only when
-the helper file is present and fails the check, and otherwise passes nothing.
+so TMA runs **sandboxed by default** and the flag is unnecessary. Add it only in
+the third row of the table, where Chromium itself would abort first.
 
 To use the setuid sandbox instead:
 
@@ -597,30 +590,14 @@ sudo chown root:root <out>/chrome-sandbox
 sudo chmod 4755   <out>/chrome-sandbox
 ```
 
-### 7.2 Clicking to run
+### 7.2 Desktop integration
 
-`./tma.sh` at the repository root is the launcher. It is executable, so on
-Nautilus set **Preferences → Behaviour → Executable text files → Run them**,
-then double-click `tma.sh`. It needs no terminal:
-
-* finds `build/tma` first, then `<out>/tma`;
-* recovers `WAYLAND_DISPLAY` from `$XDG_RUNTIME_DIR` if the shell lost it
-  (the usual reason a double-clicked app "does nothing");
-* adds `--no-sandbox` only in the one case Chromium itself would refuse to
-  start (see [§7.1](#71-the-sandbox));
-* logs everything to `~/.cache/tma-logs/`, and reports failures with
-  `notify-send` so they are visible without a terminal.
-
-For an app-grid entry instead, `packaging/tma.desktop` and
-`packaging/tma.svg` are provided:
-
-```bash
-install -Dm644 packaging/tma.desktop ~/.local/share/applications/tma.desktop
-install -Dm644 packaging/tma.svg     ~/.local/share/icons/hicolor/scalable/apps/tma.svg
-```
-
-`Exec=tma %U`, so either put the directory containing the `tma` binary on your
-`PATH`, point `Exec=` at `tma.sh`'s absolute path, or run `./tma.sh` by hand.
+There is no `.desktop` entry or icon in this repository. The window announces
+itself to the compositor as `tma` (`tma/browser/tma_platform_delegate.cc`, the
+Wayland `xdg_toplevel.set_app_id`), so if you do want an app-grid entry, point
+`Icon=` at whatever artwork you like and keep the file name `tma.desktop` — the
+shell matches on that string. A kiosk install normally skips this entirely and
+autostarts instead.
 
 ---
 
@@ -766,7 +743,8 @@ WebGL runs on ANGLE over desktop GL (`angle_enable_vulkan = false`).
 | `error: dnf not found; this script is Fedora-only` | [§5](#5-build-dependencies-fedora) targets Fedora; use the package list directly on another distribution |
 | `WAYLAND_DISPLAY is not set` | start TMA from a Wayland session — there is no X11 and no headless fallback compiled in |
 | the process exits immediately, sandbox related | see [§7.1](#71-the-sandbox) — the flag is almost never the answer |
-| double-clicking `tma.sh` does nothing | Nautilus opens text files by default; set Preferences → Behaviour → Executable text files → **Run them**. Errors are in `~/.cache/tma-logs/` |
+| `Invalid file descriptor to ICU data received` | `icudtl.dat` is not next to the binary; re-run `scripts/package_tma.sh` |
+| `Error loading V8 startup snapshot file` | `snapshot_blob.bin` is not next to the binary; re-run `scripts/package_tma.sh` |
 | `tma` starts but shows nothing / 0 processes | the `WAYLAND_DISPLAY` variable was lost by your shell. Re-run with `env WAYLAND_DISPLAY=wayland-0 DISPLAY=:0 <out>/tma --no-sandbox` |
 | `autoninja: command not found` | `PATH` is missing `depot_tools`: `export PATH="$HOME/depot_tools:$PATH"` |
 | edited `./tma/**` and nothing changed | the graft **copies** the tree; re-run `./build.sh` — see [§6.2](#62-why-you-must-re-run-buildsh-after-editing-tma) |
@@ -799,8 +777,6 @@ WebGL runs on ANGLE over desktop GL (`angle_enable_vulkan = false`).
 TMA.md                     plan and requirements
 CHROMIUM_VERSION           the Chromium release tag TMA builds against
 build.sh                   single entry point for the whole workflow
-tma.sh                     double-clickable launcher (finds the binary, fixes
-                           WAYLAND_DISPLAY, decides on the sandbox, logs)
 Makefile                   thin wrapper over build.sh
 tma/BUILD.gn               GN target; lives at the root of a Chromium checkout
 tma/tma_pak.gni            the trimmed resource-pack lists
@@ -808,6 +784,5 @@ tma/app/                   process entry point and ContentMainDelegate
 tma/browser/               browser client, main parts, platform delegate, frame
 tma/resources/index.html   default application page
 scripts/                   deps, setup, build, run and package helpers
-packaging/                 .desktop entry and icon
 build/                     gitignored: the staged, stripped copy to ship
 ```

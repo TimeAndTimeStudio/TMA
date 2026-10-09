@@ -100,7 +100,7 @@ if [[ -d "$TMA_OUT/locales" ]]; then
 fi
 
 # The setuid sandbox helper is optional: without it Chromium uses the
-# user-namespace sandbox, which Fedora allows by default. See tma.sh.
+# user-namespace sandbox, which Fedora allows by default. See README §7.1.
 if [[ -f "$TMA_OUT/chrome-sandbox" ]]; then
   cp -f "$TMA_OUT/chrome-sandbox" "$DIST/chrome-sandbox"
   chmod 4755 "$DIST/chrome-sandbox"
@@ -129,7 +129,7 @@ log "  tma_resources     $(du -sh --apparent-size "$DIST/tma_resources" | cut -f
 log ""
 log "total: $(du -sh --apparent-size "$DIST" | cut -f1) in $DIST"
 if [[ -x "$DIST/tma" ]]; then
-  log "run it with: ./tma.sh      (double-clickable; needs a Wayland session)"
+  log "run it with: $DIST/tma   (needs a Wayland session)"
 else
   log "unpack first: xz -dk $DIST/tma.xz"
 fi
