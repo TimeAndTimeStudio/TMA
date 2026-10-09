@@ -86,8 +86,11 @@ void TmaPlatformDelegate::CreatePlatformWindow(
   // TMA draws its own top bar, so the platform must not decorate the window.
   params.remove_standard_frame = true;
   params.delegate = shell_data.widget_delegate.get();
-  params.wm_class_class = "tma";
-  params.wm_class_name = params.wm_class_class;
+  // Wayland's xdg_toplevel_set_app_id, which is what the compositor matches a
+  // window against when placing it in a taskbar or dock. The equivalent
+  // wm_class_name / wm_class_class pair is deliberately not set: its only
+  // reader is ui/ozone/platform/x11/x11_window.cc:417, and this build has
+  // ozone_platform_x11 off, so nothing would ever pick the value up.
   params.wayland_app_id = "tma";
 
   shell_data.window_widget->Init(std::move(params));
