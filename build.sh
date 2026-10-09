@@ -37,12 +37,15 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 # Where the build lands.  Kept in sync with TMA_OUT / CHROMIUM_SRC below.
 out_dir() { printf '%s' "${TMA_OUT:-${CHROMIUM_SRC:-$HOME/chromium/src}/out/Default}"; }
 
+# Where the staged, stripped copy lands: this repository's build/ directory.
+stage_dir() { printf '%s' "$SCRIPT_DIR/build"; }
+
 report() {
-  local out exe res pkg
+  local out pkg exe res
   out="$(out_dir)"
+  pkg="$(stage_dir)"
   exe="$out/tma"
   res="$out/tma_resources"
-  pkg="$out/package"
 
   printf '\n\033[1mdone\033[0m\n\n'
   if [[ ! -x "$exe" ]]; then
@@ -97,12 +100,12 @@ case "${1:-all}" in
     ;;
   clean)
     out="${CHROMIUM_SRC:-$HOME/chromium/src}/out/Default"
-    step "removing $out"
-    rm -rf "$out"
+    step "removing $out and $SCRIPT_DIR/build"
+    rm -rf "$out" "$SCRIPT_DIR/build"
     ;;
   distclean)
-    step "removing the Chromium checkout and depot_tools"
-    rm -rf "${CHROMIUM_SRC:-$HOME/chromium/src}" "${DEPOT_TOOLS:-$HOME/depot_tools}"
+    step "removing the Chromium checkout, depot_tools and build/"
+    rm -rf "${CHROMIUM_SRC:-$HOME/chromium/src}" "${DEPOT_TOOLS:-$HOME/depot_tools}" "$SCRIPT_DIR/build"
     ;;
   *)
     printf 'usage: %s [all|deps|setup|build|run|package|clean|distclean]\n' "$0" >&2

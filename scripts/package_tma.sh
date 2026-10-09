@@ -10,12 +10,16 @@
 # packaging step you run yourself. It is by far the largest single saving:
 # the symbol table alone is ~140 MB of the binary.
 #
+# The staged copy lands in this repository's build/ directory by default, not
+# in the Chromium checkout: the build tree is disposable, the staged copy is
+# what you keep or ship.
+#
 # Usage:
 #   scripts/package_tma.sh [--xz] [output-dir]
 #
 # Arguments:
 #   --xz          also write <output-dir>/tma.xz (xz -9)
-#   output-dir    default: <TMA_OUT>/package
+#   output-dir    default: <this repository>/build
 #
 # Environment:
 #   CHROMIUM_SRC  Chromium src/ directory. Default: $HOME/chromium/src
@@ -27,6 +31,7 @@ log() { printf '%s\n' "$*" >&2; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 CHROMIUM_SRC="${CHROMIUM_SRC:-$HOME/chromium/src}"
 TMA_OUT="${TMA_OUT:-$CHROMIUM_SRC/out/Default}"
@@ -37,7 +42,7 @@ if [[ "${1:-}" == "--xz" ]]; then
   shift
 fi
 
-DIST="${1:-$TMA_OUT/package}"
+DIST="${1:-$PROJECT_ROOT/build}"
 
 EXE="$TMA_OUT/tma"
 PAK="$TMA_OUT/content_shell.pak"

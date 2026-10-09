@@ -3,7 +3,9 @@
 *.swp
 *~
 
-# local build staging (build output lives in $CHROMIUM_SRC/out, not here)
+# local staging: scripts/package_tma.sh lands the stripped, shippable copy
+# here. The Chromium build tree itself lives in $CHROMIUM_SRC/out, not here.
+build/
 out/
 dist/
 *.tar.xz

@@ -62,7 +62,7 @@ done
   app page   /home/you/chromium/src/out/Default/tma_resources/index.html
   size       274M
 
-  packaged   /home/you/chromium/src/out/Default/package
+  packaged   /home/you/Documents/EDIT/TMA/build
     tma          146M (stripped)
     tma.xz       39M
     content_shell.pak  1.7M
@@ -71,13 +71,15 @@ done
 run it with:
   env WAYLAND_DISPLAY=wayland-0 DISPLAY=:0 /home/you/chromium/src/out/Default/tma --no-sandbox
 ship it with:
-  /home/you/chromium/src/out/Default/package
+  /home/you/Documents/EDIT/TMA/build
 ```
 
 The directory holding `binary` is called **`<out>`** in the rest of this
-document, and the binary inside it is `<out>/tma`. Run it, and you get a window
-showing a live clock plus a demo page that exercises `fetch()` and `WebSocket` —
-see [§2](#2-using-tma).
+document, and the binary inside it is `<out>/tma`. The directory holding
+`packaged` is this repository's own **`build/`**, gitignored, and is what you
+copy onto another machine. Run `<out>/tma`, and you get a window showing a live
+clock plus a demo page that exercises `fetch()` and `WebSocket` — see
+[§2](#2-using-tma).
 
 ---
 
@@ -424,7 +426,7 @@ scripts in `scripts/`, and it runs them in order every time:
 | 1 | `scripts/install_deps.sh` | probe and install the missing Fedora packages | skips `sudo` when nothing is missing |
 | 2 | `scripts/setup_chromium.sh` | depot_tools → fetch → **pin to `CHROMIUM_VERSION`** → `gclient sync` → graft `tma/` → hook `//tma` into the root `BUILD.gn` → trim the resource pack → `gn gen` | no-op once on the tag |
 | 3 | `scripts/build_tma.sh` | `autoninja -C out/Default tma` | incremental, ~40–50 s |
-| 4 | `scripts/package_tma.sh` | copy the binary, the `.pak` and `tma_resources/` into `<out>/package/`, then `strip` the copy | a few seconds (274 MB copy + strip) |
+| 4 | `scripts/package_tma.sh` | copy the binary, the `.pak` and `tma_resources/` into this repository's `build/` directory, then `strip` the copy | a few seconds (274 MB copy + strip) |
 
 Each script's own header comment documents its internal flags, for the rare case
 you need one. Nothing in this README depends on them.
@@ -506,10 +508,13 @@ Result: `content_shell.pak` is **1.76 MB**.
 
 ## 7. Packaging
 
-`./build.sh` already does this as step 4 — you get `<out>/package/` without
-asking. What it does there is copy the binary, the `.pak` and `tma_resources/`
-into a staging directory and `strip` the **copy**, leaving the build output
-alone (a stripped binary recompiles much more slowly).
+`./build.sh` already does this as step 4. The staged copy lands in **this
+repository's own `build/` directory**, not inside the Chromium checkout — the
+build tree is disposable, `build/` is what you keep or ship. It is gitignored.
+
+What happens there: the binary, the `.pak` and `tma_resources/` are copied into
+`build/`, then the **copy** is stripped, leaving `<out>/tma` alone (a stripped
+binary recompiles much more slowly).
 
 `strip` is **not** optional on Linux: Chromium never strips its own output
 (`enable_stripping` is only referenced from `build/config/apple/`), so the debug
@@ -518,21 +523,24 @@ largest single saving.
 
 | | size |
 |---|---:|
-| `tma`, unstripped | 273.1 MB |
-| `tma`, stripped | **145.6 MB** |
+| `tma`, unstripped (in `<out>`) | 273.1 MB |
+| `tma`, stripped (in `build/`) | **145.6 MB** |
 | `tma.xz` (`xz -9`) | **38.9 MB** |
 | `content_shell.pak` | 1.76 MB |
 
-The staged directory contains `tma`, `content_shell.pak`, `tma_resources/` and,
-if present, `chrome-sandbox` (copied with mode `4755`).
+`build/` contains `tma`, `content_shell.pak`, `tma_resources/` and, if present,
+`chrome-sandbox` (copied with mode `4755`). Copy the whole directory to another
+machine and run `build/tma --no-sandbox` from a Wayland session.
 
-To also compress the binary, or to stage somewhere other than `<out>/package`,
-run the script directly:
+To also compress the binary, or to stage somewhere else, run the script
+directly:
 
 ```bash
-scripts/package_tma.sh --xz          # also write <out>/package/tma.xz
-scripts/package_tma.sh /tmp/tma-dist # stage somewhere else
+scripts/package_tma.sh --xz           # also write build/tma.xz
+scripts/package_tma.sh /tmp/tma-dist  # stage somewhere else
 ```
+
+`./build.sh clean` removes `build/` along with `<out>`.
 
 ### 7.1 The sandbox
 
@@ -743,4 +751,5 @@ tma/browser/               browser client, main parts, platform delegate, frame
 tma/resources/index.html   default application page
 scripts/                   deps, setup, build, run and package helpers
 packaging/                 .desktop entry and icon
+build/                     gitignored: the staged, stripped copy to ship
 ```
