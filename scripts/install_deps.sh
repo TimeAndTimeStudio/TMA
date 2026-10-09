@@ -87,6 +87,16 @@ REQUIRED=(
   binutils     # `strip`, used once by scripts/package_tma.sh
 )
 
+# Both entries above were confirmed necessary the same way the block below
+# confirms the removals -- shadow the tool with a BLOCKED stub and run:
+#
+#   git      ./build.sh setup  -> fails at "Pinning Chromium"
+#            "BLOCKED: git called unexpectedly" / "no such Chromium tag"
+#   binutils ./build.sh package -> fails at "stripping <dist>/tma"
+#
+# git is never named on a command line in any of these scripts; setup_chromium.sh
+# gets to it through `gclient sync`, and the tag-pinning step calls it directly.
+
 # DELIBERATELY DROPPED from upstream's install-build-deps.py dev_list, each
 # verified rather than assumed. The check was to shadow the tool with a stub
 # that prints BLOCKED and exits 1, then run `./build.sh setup` and rebuild
