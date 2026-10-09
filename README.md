@@ -38,17 +38,37 @@ WebSocket connection itself.
 ## 1. Quick start
 
 ```bash
-./build.sh deps      # install the 6 Fedora packages (needs sudo once)
-./build.sh           # fetch pinned Chromium, graft tma/, compile everything
-./build.sh run       # launch
+./build.sh
 ```
 
-The first `./build.sh` downloads the Chromium source and its toolchains and
-compiles the whole tree. It is heavy. Every step after that is idempotent: a
-second `./build.sh` only rebuilds what actually changed (typically 40–50 s).
+That is the whole workflow. One command, no arguments. It installs the missing
+Fedora packages, fetches the pinned Chromium source and its toolchains, grafts
+`tma/` into the checkout, generates the build graph and compiles everything.
 
-You will end up with a window showing a live clock plus a demo page that
-exercises `fetch()` and `WebSocket` — see [§2](#2-using-tma).
+The first run is heavy (Chromium source + toolchains + a full compile). Every
+run after that is idempotent: it only rebuilds what actually changed, typically
+40–50 s.
+
+When it finishes it prints where the result is, e.g.:
+
+```
+==> 3/3 build
+
+done
+
+  binary     /home/you/chromium/src/out/Default/tma
+  resources  /home/you/chromium/src/out/Default/tma_resources
+  app page   /home/you/chromium/src/out/Default/tma_resources/index.html
+  size       274M (strip it for shipping: scripts/package_tma.sh)
+
+run it with:
+  env WAYLAND_DISPLAY=wayland-0 DISPLAY=:0 /home/you/chromium/src/out/Default/tma --no-sandbox
+```
+
+That printed directory is called **`<out>`** in the rest of this document, and
+the binary inside it is `<out>/tma`. Run it, and you get a window showing a live
+clock plus a demo page that exercises `fetch()` and `WebSocket` — see
+[§2](#2-using-tma).
 
 ---
 
@@ -56,38 +76,57 @@ exercises `fetch()` and `WebSocket` — see [§2](#2-using-tma).
 
 ### 2.1 The window
 
+TMA draws a **28 px dark strip** on top and nothing else — no border, no
+bevel, no shadow, no title text. The drawing below is the *hit map*, which is
+the part that is not obvious, because every boundary in it is invisible.
+
 ```
-┌──────────────────────────────────────────────────────────┐
-│▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  28 px strip  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓│  ← drag to move
-│▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓  [–] [□] [×]  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓│  ← centred buttons
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│                     web content (client)                 │
-│                     runs edge to edge                    │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
-      ↑↑↑ 8 px invisible resize ring on all four sides ↑↑↑
+     ┌──────────────────────────────────────────────────────────┐  y = 0
+     │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒ -  []  X ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│  y = 8
+     │▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ -  []  X ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓│
+     │▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓│  y = 28  strip ends
+     ├─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┤  (dashed: nothing is drawn here)
+     │                                                          │
+     │           web content — HTCLIENT, edge to edge           │
+     │                                                          │
+     │                                                          │
+     └──────────────────────────────────────────────────────────┘
 ```
 
-* The strip carries **no title text**. The only things on it are the three
-  buttons, centred.
+| Mark | Zone | Behaviour |
+|---|---|---|
+| `▒` | the outer 8 px ring, on **all four sides**, corners included | resize. Invisible, because there is no border left to paint it with. Each corner is a full 16×16 px square rather than just the ring, so the very corner of the window is grabbable |
+| ` -  []  X ` | three caption buttons, 34 × 28 px each, **centred as a group** | minimise / maximise-restore / close. Checked **before** the resize ring, so a button keeps its full height even where it overlaps the top ring |
+| `▓` | the rest of the strip | drag — move the window. Double-click to maximise / restore |
+| blank | everything below y = 28 | your page. Edge to edge, including the left, right and bottom 8 px, because the client area is the whole window |
+
+The **top 8 px of the window is a resize zone, not a drag zone** — it is inside
+the strip, but `ResizeComponentAt()` is answered before the strip falls through
+to `HTCAPTION`. The drag zone is therefore the strip from y = 8 downward,
+excluding the buttons.
+
+The buttons are centred rather than flush right so that the top-right corner and
+the right edge stay clear for the resize ring: with them flush right, the 16 px
+corner square sat *underneath* the close button and answered `HTCLOSE` instead
+of `HTTOPRIGHT`.
+
 * The strip is the **same colour** whether the window is focused or not, so it
   never changes shade when you switch workspaces.
-* Because the border thickness is 0 px, the client area starts immediately under
-  the strip — there is no gap, no bevel, no shadow drawn by TMA.
+* In fullscreen (`F11` or `--fullscreen`) the whole strip is removed and the
+  client starts at y = 0.
 
 ### 2.2 Controls
 
 | Input | What it does |
 |---|---|
-| Drag the top strip | move the window |
-| Double-click the top strip | maximise / restore |
+| Drag the strip below its top 8 px | move the window |
+| Double-click the strip | maximise / restore |
 | Drag a window **edge** | resize |
 | Drag a window **corner** | resize both axes at once |
 | `F11` | native fullscreen on / off (the strip disappears entirely) |
-| `–` button | minimise |
-| `□` button | maximise / restore |
-| `×` button | close |
+| `-` button | minimise |
+| `[]` button | maximise / restore |
+| `X` button | close |
 | **Fullscreen** button on the demo page | HTML5 `requestFullscreen()`, mapped onto the same native fullscreen as `F11` |
 
 The **resize ring is invisible**, because the frame has no border to draw it
@@ -109,8 +148,8 @@ All of Chromium's own switches still work (`--enable-logging`, `--v=1`,
 `--disable-gpu`, …).
 
 ```bash
-scripts/run_tma.sh -- --url=https://example.com --window-size=800x600
-scripts/run_tma.sh -- --url=file:///path/to/myapp/index.html
+<out>/tma --no-sandbox --url=https://example.com --window-size=800x600
+<out>/tma --no-sandbox --url=file:///path/to/myapp/index.html
 ```
 
 ### 2.4 What the demo page does
@@ -150,9 +189,9 @@ TMA is a shell. Your application is a web page. There is nothing else to learn.
 ### 3.1 Simplest path: replace the demo page
 
 ```bash
-cp -r "$HOME/chromium/src/out/Default/tma_resources" ~/my-tma-app
+cp -r <out>/tma_resources ~/my-tma-app
 $EDITOR ~/my-tma-app/index.html
-scripts/run_tma.sh -- --url=file://$HOME/my-tma-app/index.html
+<out>/tma --no-sandbox --url=file://$HOME/my-tma-app/index.html
 ```
 
 Whatever you put in that directory is what TMA shows. Plain HTML, a SPA, a
@@ -302,12 +341,9 @@ therefore needs only a small toolchain. Everything here is written for
 
 ### 5.1 Install
 
-```bash
-./build.sh deps            # probes with rpm -q, installs only what is missing
-./build.sh deps --dry-run  # same report, never calls sudo
-```
-
-Or by hand:
+`./build.sh` installs these itself: it probes each one with `rpm -q` and only
+calls `sudo dnf install` for the packages that are missing, so the second run
+asks for no password. If you would rather do it once by hand:
 
 ```bash
 sudo dnf install git perl binutils bison flex gperf
@@ -365,41 +401,37 @@ all of which a Fedora Wayland session already ships.
 
 ## 6. Building
 
-### 6.1 Commands
-
-| Command | Effect |
-|---|---|
-| `./build.sh` | deps → setup → build (the whole workflow) |
-| `./build.sh run` | build if necessary, then launch |
-| `./build.sh deps [--dry-run]` | install missing Fedora packages only |
-| `./build.sh setup` | depot_tools → fetch → pin → `gclient sync` → graft `tma/` → `gn gen` |
-| `./build.sh build` | `autoninja -C out/Default tma`, incremental |
-| `./build.sh package [--xz]` | stage a distributable directory (see [§7](#7-packaging)) |
-| `./build.sh clean` | delete `out/Default`, keep the checkout |
-| `./build.sh distclean` | delete the checkout and `depot_tools` |
-| `make` | thin wrapper over `./build.sh`; `make` itself is optional |
-
-Environment overrides: `CHROMIUM_SRC` (default `$HOME/chromium/src`),
-`DEPOT_TOOLS` (default `$HOME/depot_tools`), `TMA_OUT` (default
-`<src>/out/Default`), `CHROMIUM_TAG`.
-
-### 6.2 The three steps, and why `setup` copies files
-
-| Step | Script | Cost on a re-run |
-|---|---|---|
-| 1. packages | `scripts/install_deps.sh` | skips `sudo` when nothing is missing |
-| 2. Chromium + graft | `scripts/setup_chromium.sh` | no-op once on the tag |
-| 3. compile | `scripts/build_tma.sh` | incremental, ~40–50 s |
-
-**`setup` *copies* `tma/` into the checkout** (`$CHROMIUM_SRC/tma`) — GN has to
-see the files where the build graph expects them. So editing anything under
-`./tma/` does nothing until you re-run:
+### 6.1 The command
 
 ```bash
-./build.sh setup && ./build.sh build
+./build.sh
 ```
 
-This is the single most common mistake when iterating on TMA's own C++.
+There is nothing else to invoke. `build.sh` is a thin dispatcher over three
+scripts in `scripts/`, and it runs them in order every time:
+
+| Step | Script | What it does | Cost on a re-run |
+|---|---|---|---|
+| 1 | `scripts/install_deps.sh` | probe and install the missing Fedora packages | skips `sudo` when nothing is missing |
+| 2 | `scripts/setup_chromium.sh` | depot_tools → fetch → **pin to `CHROMIUM_VERSION`** → `gclient sync` → graft `tma/` → hook `//tma` into the root `BUILD.gn` → trim the resource pack → `gn gen` | no-op once on the tag |
+| 3 | `scripts/build_tma.sh` | `autoninja -C out/Default tma` | incremental, ~40–50 s |
+
+Each script's own header comment documents its internal flags, for the rare case
+you need one. Nothing in this README depends on them.
+
+Environment overrides (all optional): `CHROMIUM_SRC` (default
+`$HOME/chromium/src`), `DEPOT_TOOLS` (default `$HOME/depot_tools`), `TMA_OUT`
+(default `<src>/out/Default`), `CHROMIUM_TAG`.
+
+### 6.2 Why you must re-run `./build.sh` after editing `tma/`
+
+Step 2 ***copies* `tma/` into the checkout** (`$CHROMIUM_SRC/tma`) — GN has to
+see the files where the build graph expects them, so they cannot stay in this
+repository. Editing anything under `./tma/` therefore does nothing until the
+graft is refreshed, and `./build.sh` refreshes it every time.
+
+This is the single most common mistake when iterating on TMA's own C++: edit,
+then re-run `./build.sh` — not a bare `autoninja`.
 
 ### 6.3 The version pin
 
@@ -464,9 +496,13 @@ Result: `content_shell.pak` is **1.76 MB**.
 
 ## 7. Packaging
 
+`./build.sh` leaves the binary unstripped (273 MB) because debug symbols make
+compiling faster. To stage something you can actually ship, run the packaging
+script:
+
 ```bash
-./build.sh package          # strip + copy → <out>/package/
-./build.sh package --xz     # the same, but tma.xz instead of tma
+scripts/package_tma.sh            # strip + copy → <out>/package/
+scripts/package_tma.sh --xz       # the same, but tma.xz instead of tma
 ```
 
 `strip` is **not** optional on Linux: Chromium never strips its own output
@@ -491,12 +527,11 @@ Chromium's setuid helper `chrome-sandbox` must be owned by root with mode
 that way, so either:
 
 ```bash
-sudo chown root:root out/Default/chrome-sandbox
-sudo chmod 4755   out/Default/chrome-sandbox
+sudo chown root:root <out>/chrome-sandbox
+sudo chmod 4755   <out>/chrome-sandbox
 ```
 
-or pass `--no-sandbox`, which `scripts/run_tma.sh` does automatically when the
-helper is not setuid.
+or pass `--no-sandbox`, which is what the examples in this document already do.
 
 ### 7.2 Desktop entry
 
@@ -654,13 +689,13 @@ WebGL runs on ANGLE over desktop GL (`angle_enable_vulkan = false`).
 | `error: dnf not found; this script is Fedora-only` | [§5](#5-build-dependencies-fedora) targets Fedora; use the package list directly on another distribution |
 | `WAYLAND_DISPLAY is not set` | start TMA from a Wayland session — there is no X11 and no headless fallback compiled in |
 | the process exits immediately, sandbox related | see [§7.1](#71-the-sandbox) |
-| `tma` builds but shows nothing / 0 processes | the `WAYLAND_DISPLAY` variable was lost by your shell. Re-run with `env WAYLAND_DISPLAY=wayland-0 DISPLAY=:0 scripts/run_tma.sh` |
+| `tma` starts but shows nothing / 0 processes | the `WAYLAND_DISPLAY` variable was lost by your shell. Re-run with `env WAYLAND_DISPLAY=wayland-0 DISPLAY=:0 <out>/tma --no-sandbox` |
 | `autoninja: command not found` | `PATH` is missing `depot_tools`: `export PATH="$HOME/depot_tools:$PATH"` |
-| edited `./tma/**` and nothing changed | `setup` **copies** the tree; re-run `./build.sh setup && ./build.sh build` — see [§6.2](#62-the-three-steps-and-why-setup-copies-files) |
-| `matches no targets` / `unknown target 'tma'` | the root `BUILD.gn` hook is missing; re-run `./build.sh setup` |
-| `clang_revision=… but update.py expected …` | the checkout is out of sync; re-run `./build.sh setup` |
+| edited `./tma/**` and nothing changed | the graft **copies** the tree; re-run `./build.sh` — see [§6.2](#62-why-you-must-re-run-buildsh-after-editing-tma) |
+| `matches no targets` / `unknown target 'tma'` | the root `BUILD.gn` hook is missing; re-run `./build.sh` |
+| `clang_revision=… but update.py expected …` | the checkout is out of sync; re-run `./build.sh` |
 | a missing header or `.pc` file at compile time | the sysroot is missing or `use_sysroot` was turned off; see [§5.2](#52-why-the--devel-packages-are-not-needed) |
-| a step fails with `command not found: <tool>` | install it (`sudo dnf install <tool>`), re-run `./build.sh`, and consider adding it to `scripts/install_deps.sh` |
+| a step fails with `command not found: <tool>` | install it (`sudo dnf install <tool>`) and re-run `./build.sh` |
 | `multiple rules generate tma` | a root group named `tma` was added by hand; it must be named `tma_hook` |
 
 ---

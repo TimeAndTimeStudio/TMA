@@ -27,6 +27,34 @@ cd "$SCRIPT_DIR"
 
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
+# Where the build lands.  Kept in sync with TMA_OUT / CHROMIUM_SRC below.
+out_dir() { printf '%s' "${TMA_OUT:-${CHROMIUM_SRC:-$HOME/chromium/src}/out/Default}"; }
+
+report() {
+  local out exe res
+  out="$(out_dir)"
+  exe="$out/tma"
+  res="$out/tma_resources"
+
+  printf '\n\033[1mdone\033[0m\n\n'
+  if [[ -x "$exe" ]]; then
+    printf '  binary     \033[1m%s\033[0m\n' "$exe"
+    printf '  resources  %s\n' "$res"
+    printf '  app page   %s\n' "$res/index.html"
+    printf '  size       %s (strip it for shipping: scripts/package_tma.sh)\n' \
+      "$(du -h --apparent-size "$exe" | cut -f1)"
+
+    printf '\nrun it with:\n'
+    printf '  env WAYLAND_DISPLAY=wayland-0 DISPLAY=:0 %q --no-sandbox\n' "$exe"
+    if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+      printf '  (your shell has no WAYLAND_DISPLAY; start it from a Wayland session)\n'
+    fi
+  else
+    printf '  expected %s but it is missing\n' "$exe"
+    return 1
+  fi
+}
+
 case "${1:-all}" in
   all)
     step "1/3 deps"
@@ -35,7 +63,7 @@ case "${1:-all}" in
     scripts/setup_chromium.sh
     step "3/3 build"
     scripts/build_tma.sh
-    printf '\nDone. Run it with: ./build.sh run\nFor a shippable copy: ./build.sh package\n'
+    report
     ;;
   deps)
     shift
