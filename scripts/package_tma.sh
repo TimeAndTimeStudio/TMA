@@ -100,7 +100,10 @@ if [[ -d "$TMA_OUT/locales" ]]; then
 fi
 
 # The setuid sandbox helper is optional: without it Chromium uses the
-# user-namespace sandbox, which Fedora allows by default. See README §7.1.
+# Linux user-namespace sandbox, which Fedora allows by default
+# (kernel.unprivileged_userns_clone does not exist outside Debian/Ubuntu, and
+# /proc/sys/user/max_user_namespaces is non-zero on stock Fedora). Chromium
+# only looks for this file; if it is absent it falls back on its own.
 if [[ -f "$TMA_OUT/chrome-sandbox" ]]; then
   cp -f "$TMA_OUT/chrome-sandbox" "$DIST/chrome-sandbox"
   chmod 4755 "$DIST/chrome-sandbox"
