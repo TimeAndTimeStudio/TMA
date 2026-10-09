@@ -7,8 +7,7 @@
 # This BUILD.gn lives at the root of a Chromium checkout as //tma/BUILD.gn.
 # GN only follows dependency paths out of //BUILD.gn, so scripts/setup_chromium.sh
 # appends a `group("tma_hook")` to that file to pull this one into the build
-# graph — without it `ninja tma` reports `unknown target 'tma'`. See README.md §5
-# for the full list of places setup touches.
+# graph — without it `ninja tma` reports `unknown target 'tma'`.
 #
 # The resource bundle is NOT defined here: the embedder loads whatever sits at
 # `content_shell.pak` (//content/shell/app/shell_main_delegate.cc:400,422) and

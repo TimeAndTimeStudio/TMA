@@ -4,7 +4,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := all
 
-.PHONY: all deps setup build run clean distclean
+.PHONY: all deps setup build run package clean distclean
 
 all:
 	./build.sh
@@ -20,6 +20,9 @@ build:
 
 run:
 	./build.sh run
+
+package:
+	./build.sh package
 
 clean:
 	./build.sh clean

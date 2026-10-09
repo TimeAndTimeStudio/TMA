@@ -27,6 +27,15 @@ set -euo pipefail
 log() { printf '\n==> %s\n' "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
+# TMA is Linux and Wayland only, and //tma/BUILD.gn asserts the same two facts
+# at GN time. Fail here instead, before gclient sync downloads a tree that gn
+# gen would then reject: Chromium would otherwise be fetched in full on a host
+# where this checkout can never be built.
+case "$(uname -s)" in
+  Linux) ;;
+  *) die "TMA only supports Linux (this host is $(uname -s))" ;;
+esac
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMA_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -297,7 +306,6 @@ fi
 #                              once the DevTools HTTP endpoint goes too, which
 #                              needs a source patch.
 #
-# See README.md section 5.
 GN_ARGS=$(cat <<'EOF'
 # --- build type ---------------------------------------------------------------
 is_debug = false
