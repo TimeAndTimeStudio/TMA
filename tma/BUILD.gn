@@ -18,6 +18,7 @@
 #
 #   autoninja -C out/Default tma
 
+import("//build/config/features.gni")
 import("//build/config/ozone.gni")
 import("//build/config/ui.gni")
 
@@ -44,6 +45,8 @@ source_set("tma_shell") {
     "browser/tma_caption_button.h",
     "browser/tma_content_browser_client.cc",
     "browser/tma_content_browser_client.h",
+    "browser/tma_dark_mode.cc",
+    "browser/tma_dark_mode.h",
     "browser/tma_frame_view.cc",
     "browser/tma_frame_view.h",
     "browser/tma_fullscreen.cc",
@@ -73,6 +76,7 @@ source_set("tma_shell") {
     "//ui/display",
     "//ui/events",
     "//ui/gfx",
+    "//ui/native_theme",
     "//ui/resources",
     "//ui/views",
     "//ui/views/controls/webview",
@@ -80,6 +84,18 @@ source_set("tma_shell") {
     "//ui/wm",
     "//url",
   ]
+
+  if (use_dbus) {
+    # tma_dark_mode.cc reads org.freedesktop.appearance over D-Bus so that
+    # pages get a correct prefers-color-scheme. //content/shell has no
+    # equivalent of ChromeBrowserMainExtraPartsViewsLinux's dark mode manager,
+    # and the one upstream class that does exist cannot deliver the value
+    # without a GTK LinuxUiTheme, so an embedder has to do it.
+    deps += [
+      "//components/dbus",
+      "//dbus",
+    ]
+  }
 }
 
 # Copies the demo/serving HTML next to the built executable so that the shell

@@ -22,6 +22,7 @@
 #include "net/base/filename_util.h"
 #include "net/base/module/net_module.h"
 #include "net/grit/net_resources.h"
+#include "tma/browser/tma_dark_mode.h"
 #include "tma/browser/tma_metrics.h"
 #include "tma/browser/tma_platform_delegate.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -69,6 +70,13 @@ TmaBrowserMainParts::TmaBrowserMainParts() = default;
 TmaBrowserMainParts::~TmaBrowserMainParts() = default;
 
 int TmaBrowserMainParts::PreMainMessageLoopRun() {
+  // Content shell has no equivalent of
+  // ChromeBrowserMainExtraPartsViewsLinux::dark_mode_manager_, and the one
+  // upstream class that does exist cannot deliver the value in a non-GTK
+  // build, so the desktop's color scheme never reaches Blink and
+  // prefers-color-scheme is stuck on "light". See tma_dark_mode.h.
+  InitDarkModeFromPortal();
+
   InitializeBrowserContexts();
   content::Shell::Initialize(CreateShellPlatformDelegate());
   net::NetModule::SetResourceProvider(TmaPlatformResourceProvider);

@@ -119,7 +119,19 @@ rm -rf "$CHROMIUM_SRC/tma/out"
 # drops the patch, which is why it is re-applied on every graft.
 ROOT_BUILD="$CHROMIUM_SRC/BUILD.gn"
 ROOT_BUILD_MARK="# --- TMA hook (added by scripts/setup_chromium.sh) ---"
+ROOT_BUILD_DEPS='  deps = [ "//tma:tma" ]'
 if grep -qF "$ROOT_BUILD_MARK" "$ROOT_BUILD"; then
+  # The marker alone is not enough: a hand edit (or a half-applied patch) can
+  # leave the block present but pointing at a target that does not exist, which
+  # surfaces much later as `Unresolved dependencies: //tma:...` out of gn gen.
+  # Repair in place so the failure mode is one warning instead of a dead build.
+  if ! grep -qxF "$ROOT_BUILD_DEPS" "$ROOT_BUILD"; then
+    log "Root //BUILD.gn hook is malformed; repairing its deps line"
+    sed -i -e "s|^  deps = \[ \"//tma:[^\"]*\" \]$|$ROOT_BUILD_DEPS|" "$ROOT_BUILD"
+  fi
+  if ! grep -qxF "$ROOT_BUILD_DEPS" "$ROOT_BUILD"; then
+    die "$ROOT_BUILD has the TMA hook marker but no //tma:tma deps line"
+  fi
   log "Root //BUILD.gn already hooks in //tma"
 else
   log "Hooking //tma into the root //BUILD.gn"

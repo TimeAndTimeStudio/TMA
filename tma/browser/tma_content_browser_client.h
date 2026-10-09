@@ -11,9 +11,9 @@
 
 namespace tma {
 
-// The only thing TMA changes about content shell's browser client is which
-// BrowserMainParts get created, so that the window/URL/platform delegate can
-// be replaced.
+// TMA differs from content shell in two ways: which BrowserMainParts get
+// created (so the window/URL/platform delegate can be replaced), and how the
+// preferred color scheme is picked.
 class TmaContentBrowserClient : public content::ShellContentBrowserClient {
  public:
   TmaContentBrowserClient();
@@ -24,6 +24,9 @@ class TmaContentBrowserClient : public content::ShellContentBrowserClient {
   // content::ShellContentBrowserClient:
   std::unique_ptr<content::BrowserMainParts> CreateBrowserMainParts(
       bool is_integration_test) override;
+  void OverrideWebPreferences(content::WebContents* web_contents,
+                              content::SiteInstance& main_frame_site,
+                              blink::web_pref::WebPreferences* prefs) override;
 };
 
 }  // namespace tma
