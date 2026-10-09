@@ -67,7 +67,11 @@ report() {
   fi
 
   printf '\nrun it with:\n'
-  printf '  env WAYLAND_DISPLAY=wayland-0 DISPLAY=:0 %q --no-sandbox\n' "$exe"
+  if [[ -x "$pkg/tma" ]]; then
+    printf '  %q\n' "$pkg/tma"
+  else
+    printf '  %q\n' "$exe"
+  fi
   printf 'ship it with:\n'
   printf '  %s\n' "$pkg"
   if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
