@@ -58,8 +58,12 @@ report() {
   fi
 
   printf '  binary     %s\n' "$exe"
-  printf '  resources  %s\n' "$res"
-  printf '  app page   %s\n' "$res/index.html"
+  if [[ -d "$res" ]]; then
+    printf '  resources  %s\n' "$res"
+    printf '  app page   %s\n' "$res/index.html"
+  else
+    printf '  resources  not built (startup is a URL)\n'
+  fi
   printf '  size       %s\n' "$(du -h --apparent-size "$exe" | cut -f1)"
 
   printf '\n  packaged   %s\n' "$pkg"

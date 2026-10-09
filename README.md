@@ -60,6 +60,10 @@ and the config only chooses between that page and a URL. Everything else in
 preserved — keep assets at the top level. An empty `startup` is an error, and
 `./build.sh` reports it in under a second.
 
+With `startup = url:...` nothing would ever read that directory, so it is left
+out of the build entirely: no `<app_name>_resources/` is produced, and an
+earlier one is deleted on the next build.
+
 There is deliberately no window title. The top bar carries the three caption
 buttons and no text, so a page's `<title>` has nowhere to appear and is
 ignored.

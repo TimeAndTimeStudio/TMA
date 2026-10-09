@@ -58,7 +58,11 @@ RES="$TMA_OUT/$RES_DIR"
 
 [[ -x "$EXE" ]] || die "$EXE not found; run scripts/build_tma.sh first"
 [[ -f "$PAK" ]] || die "$PAK not found; run scripts/build_tma.sh first"
-[[ -d "$RES" ]] || die "$RES not found; run scripts/build_tma.sh first"
+# Usually required, but not when tma.conf opens a URL: the copy target is left
+# out of the build graph then, so the directory should not exist at all.
+if [[ "$(tma_conf_get startup)" != url:* && ! -d "$RES" ]]; then
+  die "$RES not found; run scripts/build_tma.sh first"
+fi
 
 bytes() { # bytes <file> -> "12345678 B (117.7 MB)"
   local n
@@ -72,7 +76,11 @@ rm -rf "${DIST:?}/$RES_DIR"
 log "staging -> $DIST"
 cp -f "$EXE"   "$DIST/$APP"
 cp -f "$PAK"   "$DIST/content_shell.pak"
-cp -a "$RES"   "$DIST/$RES_DIR"
+if [[ -d "$RES" ]]; then
+  # Absent when tma.conf opens a URL -- see the check above. The rm -rf
+  # already handled a case where an earlier build did produce one.
+  cp -a "$RES" "$DIST/$RES_DIR"
+fi
 
 # Runtime files that must sit next to the binary. Chromium resolves them
 # relative to /proc/self/exe, so a staged copy without them dies at startup
@@ -136,7 +144,11 @@ fi
 
 log ""
 log "  content_shell.pak $(bytes "$DIST/content_shell.pak")"
-log "  $RES_DIR     $(du -sh --apparent-size "$DIST/$RES_DIR" | cut -f1)"
+if [[ -d "$DIST/$RES_DIR" ]]; then
+  log "  $RES_DIR     $(du -sh --apparent-size "$DIST/$RES_DIR" | cut -f1)"
+else
+  log "  $RES_DIR     not packaged (startup is a URL)"
+fi
 log ""
 log "total: $(du -sh --apparent-size "$DIST" | cut -f1) in $DIST"
 if [[ -x "$DIST/$APP" ]]; then

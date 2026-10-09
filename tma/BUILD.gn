@@ -135,12 +135,21 @@ source_set("tma_shell") {
 # `autoninja ... tma_resources` keep working; only the directory on disk is
 # named from tma.conf, and TmaBrowserMainParts builds the same name from
 # TMA_APP_NAME at startup.
-copy("tma_resources") {
-  testonly = true
+#
+# It is only part of the build when tma.conf actually opens it. With
+# `startup = url:...` nothing would ever read the directory, so the target is
+# left out of the graph instead of copied and then ignored: a URL-configured
+# build has no <app_name>_resources on disk at all. scripts/build_tma.sh drops
+# a directory left behind by an earlier `startup = file`, because ninja only
+# ever adds outputs and never removes them.
+if (tma_startup_url == "") {
+  copy("tma_resources") {
+    testonly = true
 
-  sources = expand_directory("resources", true)
+    sources = expand_directory("resources", true)
 
-  outputs = [ "$root_out_dir/${tma_app_name}_resources/{{source_file_part}}" ]
+    outputs = [ "$root_out_dir/${tma_app_name}_resources/{{source_file_part}}" ]
+  }
 }
 
 executable("tma") {
@@ -162,11 +171,14 @@ executable("tma") {
   ]
 
   data_deps = [
-    ":tma_resources",
     "//components/crash/core/app:chrome_crashpad_handler",
     "//content/shell:pak",
     "//tools/v8_context_snapshot",
   ]
+  if (tma_startup_url == "") {
+    # Only declared when the copy target above exists; see the comment there.
+    data_deps += [ ":tma_resources" ]
+  }
 
   if (!is_component_build) {
     configs += [ "//build/config/gcc:rpath_for_built_shared_libraries" ]
