@@ -43,32 +43,41 @@ WebSocket connection itself.
 
 That is the whole workflow. One command, no arguments. It installs the missing
 Fedora packages, fetches the pinned Chromium source and its toolchains, grafts
-`tma/` into the checkout, generates the build graph and compiles everything.
+`tma/` into the checkout, generates the build graph, compiles everything, and
+stages a stripped copy you can ship.
 
 The first run is heavy (Chromium source + toolchains + a full compile). Every
 run after that is idempotent: it only rebuilds what actually changed, typically
 40–50 s.
 
-When it finishes it prints where the result is, e.g.:
+When it finishes it prints where everything landed, e.g.:
 
 ```
-==> 3/3 build
+==> 4/4 package
 
 done
 
   binary     /home/you/chromium/src/out/Default/tma
   resources  /home/you/chromium/src/out/Default/tma_resources
   app page   /home/you/chromium/src/out/Default/tma_resources/index.html
-  size       274M (strip it for shipping: scripts/package_tma.sh)
+  size       274M
+
+  packaged   /home/you/chromium/src/out/Default/package
+    tma          146M (stripped)
+    tma.xz       39M
+    content_shell.pak  1.7M
+    total        187M
 
 run it with:
   env WAYLAND_DISPLAY=wayland-0 DISPLAY=:0 /home/you/chromium/src/out/Default/tma --no-sandbox
+ship it with:
+  /home/you/chromium/src/out/Default/package
 ```
 
-That printed directory is called **`<out>`** in the rest of this document, and
-the binary inside it is `<out>/tma`. Run it, and you get a window showing a live
-clock plus a demo page that exercises `fetch()` and `WebSocket` — see
-[§2](#2-using-tma).
+The directory holding `binary` is called **`<out>`** in the rest of this
+document, and the binary inside it is `<out>/tma`. Run it, and you get a window
+showing a live clock plus a demo page that exercises `fetch()` and `WebSocket` —
+see [§2](#2-using-tma).
 
 ---
 
@@ -407,7 +416,7 @@ all of which a Fedora Wayland session already ships.
 ./build.sh
 ```
 
-There is nothing else to invoke. `build.sh` is a thin dispatcher over three
+There is nothing else to invoke. `build.sh` is a thin dispatcher over four
 scripts in `scripts/`, and it runs them in order every time:
 
 | Step | Script | What it does | Cost on a re-run |
@@ -415,6 +424,7 @@ scripts in `scripts/`, and it runs them in order every time:
 | 1 | `scripts/install_deps.sh` | probe and install the missing Fedora packages | skips `sudo` when nothing is missing |
 | 2 | `scripts/setup_chromium.sh` | depot_tools → fetch → **pin to `CHROMIUM_VERSION`** → `gclient sync` → graft `tma/` → hook `//tma` into the root `BUILD.gn` → trim the resource pack → `gn gen` | no-op once on the tag |
 | 3 | `scripts/build_tma.sh` | `autoninja -C out/Default tma` | incremental, ~40–50 s |
+| 4 | `scripts/package_tma.sh` | copy the binary, the `.pak` and `tma_resources/` into `<out>/package/`, then `strip` the copy | a few seconds (274 MB copy + strip) |
 
 Each script's own header comment documents its internal flags, for the rare case
 you need one. Nothing in this README depends on them.
@@ -496,14 +506,10 @@ Result: `content_shell.pak` is **1.76 MB**.
 
 ## 7. Packaging
 
-`./build.sh` leaves the binary unstripped (273 MB) because debug symbols make
-compiling faster. To stage something you can actually ship, run the packaging
-script:
-
-```bash
-scripts/package_tma.sh            # strip + copy → <out>/package/
-scripts/package_tma.sh --xz       # the same, but tma.xz instead of tma
-```
+`./build.sh` already does this as step 4 — you get `<out>/package/` without
+asking. What it does there is copy the binary, the `.pak` and `tma_resources/`
+into a staging directory and `strip` the **copy**, leaving the build output
+alone (a stripped binary recompiles much more slowly).
 
 `strip` is **not** optional on Linux: Chromium never strips its own output
 (`enable_stripping` is only referenced from `build/config/apple/`), so the debug
@@ -519,6 +525,14 @@ largest single saving.
 
 The staged directory contains `tma`, `content_shell.pak`, `tma_resources/` and,
 if present, `chrome-sandbox` (copied with mode `4755`).
+
+To also compress the binary, or to stage somewhere other than `<out>/package`,
+run the script directly:
+
+```bash
+scripts/package_tma.sh --xz          # also write <out>/package/tma.xz
+scripts/package_tma.sh /tmp/tma-dist # stage somewhere else
+```
 
 ### 7.1 The sandbox
 

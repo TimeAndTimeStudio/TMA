@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
-# TMA — one command.
+# Owner: Time And Time Studio
+# Date: 2026-10-09 08:50 +0700
+# License: GPL-3.0-or-later
+
+# TMA — one command, no arguments.
 #
-#   ./build.sh            install missing deps, fetch pinned Chromium, graft tma/, build
-#   ./build.sh run        same, then launch (Wayland only)
+#   ./build.sh            install deps, fetch pinned Chromium, graft tma/,
+#                         build, then package. Prints every output path.
+#
+# The subcommands below still exist, but nothing needs them:
+#
+#   ./build.sh run        same as above, then launch (Wayland only)
 #   ./build.sh deps       install Fedora packages only
 #   ./build.sh setup      fetch/pin Chromium + graft + gn gen only
 #   ./build.sh build      incremental build of the `tma` target only
-#   ./build.sh package    stage a distributable dir: strip the binary, copy
-#                         resources; add --xz for a compressed archive
+#   ./build.sh package    stage a distributable dir; add --xz to compress
 #   ./build.sh clean      drop out/Default, keep the checkout
 #   ./build.sh distclean  drop the checkout and depot_tools as well
 #
@@ -31,38 +38,50 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 out_dir() { printf '%s' "${TMA_OUT:-${CHROMIUM_SRC:-$HOME/chromium/src}/out/Default}"; }
 
 report() {
-  local out exe res
+  local out exe res pkg
   out="$(out_dir)"
   exe="$out/tma"
   res="$out/tma_resources"
+  pkg="$out/package"
 
   printf '\n\033[1mdone\033[0m\n\n'
-  if [[ -x "$exe" ]]; then
-    printf '  binary     \033[1m%s\033[0m\n' "$exe"
-    printf '  resources  %s\n' "$res"
-    printf '  app page   %s\n' "$res/index.html"
-    printf '  size       %s (strip it for shipping: scripts/package_tma.sh)\n' \
-      "$(du -h --apparent-size "$exe" | cut -f1)"
-
-    printf '\nrun it with:\n'
-    printf '  env WAYLAND_DISPLAY=wayland-0 DISPLAY=:0 %q --no-sandbox\n' "$exe"
-    if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
-      printf '  (your shell has no WAYLAND_DISPLAY; start it from a Wayland session)\n'
-    fi
-  else
+  if [[ ! -x "$exe" ]]; then
     printf '  expected %s but it is missing\n' "$exe"
     return 1
+  fi
+
+  printf '  binary     %s\n' "$exe"
+  printf '  resources  %s\n' "$res"
+  printf '  app page   %s\n' "$res/index.html"
+  printf '  size       %s\n' "$(du -h --apparent-size "$exe" | cut -f1)"
+
+  printf '\n  packaged   %s\n' "$pkg"
+  if [[ -x "$pkg/tma" ]]; then
+    printf '    tma          %s (stripped)\n' "$(du -h --apparent-size "$pkg/tma" | cut -f1)"
+    [[ -f "$pkg/tma.xz" ]] && printf '    tma.xz       %s\n' "$(du -h --apparent-size "$pkg/tma.xz" | cut -f1)"
+    printf '    content_shell.pak  %s\n' "$(du -h --apparent-size "$pkg/content_shell.pak" | cut -f1)"
+    printf '    total        %s\n' "$(du -sh --apparent-size "$pkg" | cut -f1)"
+  fi
+
+  printf '\nrun it with:\n'
+  printf '  env WAYLAND_DISPLAY=wayland-0 DISPLAY=:0 %q --no-sandbox\n' "$exe"
+  printf 'ship it with:\n'
+  printf '  %s\n' "$pkg"
+  if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
+    printf '\n(note: your shell has no WAYLAND_DISPLAY; start TMA from a Wayland session)\n'
   fi
 }
 
 case "${1:-all}" in
   all)
-    step "1/3 deps"
+    step "1/4 deps"
     scripts/install_deps.sh
-    step "2/3 chromium (pinned) + tma"
+    step "2/4 chromium (pinned) + tma"
     scripts/setup_chromium.sh
-    step "3/3 build"
+    step "3/4 build"
     scripts/build_tma.sh
+    step "4/4 package"
+    scripts/package_tma.sh
     report
     ;;
   deps)

@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Owner: Time And Time Studio
+# Date: 2026-10-09 08:50 +0700
+# License: GPL-3.0-or-later
+
 # Runs the TMA display shell on a Wayland session.
 #
 # Usage:

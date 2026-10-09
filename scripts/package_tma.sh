@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Owner: Time And Time Studio
+# Date: 2026-10-09 08:50 +0700
+# License: GPL-3.0-or-later
+
 # Stages a distributable TMA directory: strip the binary, copy the resources.
 #
 # Chromium never strips its own output on Linux — `enable_stripping` is only
