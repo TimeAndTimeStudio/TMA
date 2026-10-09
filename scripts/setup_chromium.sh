@@ -265,6 +265,32 @@ ozone_auto_platforms = false
 ozone_platform = "wayland"
 ozone_platform_wayland = true
 
+# No X11 anywhere. ozone_platform_x11 already defaults to false and
+# ozone_auto_platforms=false keeps it that way, so //ui/ozone/platform/x11 and
+# //ui/x11 leave the graph entirely. Two system libraries still showed up in
+# `ldd` after that though -- libX11/libXext/libXrender/libXi -- and they are
+# not Chromium's X11 backend at all: libatk-bridge-2.0, libatspi and libcairo
+# each dlopen an X11 backend of their own. They arrive because use_gtk and
+# use_glib default to true on Linux, which pulls //build/config/linux/atk's
+# pkg_config("atk") into the link.
+#
+# TMA never shows a GTK widget and never talks to AT-SPI (the binary has no
+# libgtk or libgdk in `ldd` even with these on), so dropping them removes the
+# X11 libraries from the process without losing anything TMA uses. The cost is
+# that a screen reader will not find TMA; if that ever matters, put these two
+# back and accept libX11 in the address space.
+use_gtk = false
+use_glib = false
+
+# WebRTC's portal screencast (modules/portal/xdg_session_details.h) includes
+# <gio/gio.h> unconditionally, and the -I paths for glib only exist while
+# use_glib is true -- so the two above alone fail to compile
+# content/public/browser/desktop_capture.cc. rtc_use_pipewire is what pulls
+# //third_party/webrtc/modules/portal into the graph (webrtc_overrides/BUILD.gn
+# :195), and TMA never captures the screen, so turning it off removes both the
+# portal code and the video_capture targets it drags along.
+rtc_use_pipewire = false
+
 # --- WebGPU -------------------------------------------------------------------
 # //third_party/dawn plus its SPIR-V tooling, ~740 edges.
 
@@ -344,8 +370,12 @@ enable_cast_receiver = false
 #                              at link time (webrtc calls them unguarded).
 #   is_p2p_enabled             MUST stay true -> blink's mediastream loses
 #                              -Ithird_party/webrtc entirely.
-#   rtc_use_pipewire           MUST stay true -> drops pipewire_config from
-#                              //third_party/webrtc_overrides:webrtc_component.
+#   rtc_use_pipewire           now false on purpose (see the X11 block above).
+#                              It used to be listed here as MUST-stay-true
+#                              because it drops pipewire_config from
+#                              //third_party/webrtc_overrides:webrtc_component;
+#                              nothing in //tma's closure reads that config, and
+#                              it is the only way to lose WebRTC's gio include.
 #   tint_build_glsl_writer     MUST stay true -> Dawn's GL backend needs
 #                              tint::glsl / tint::null (msl/hlsl are safe off).
 #   enable_dawn                not a real arg at all (GN warns "no effect").
