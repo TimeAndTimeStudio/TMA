@@ -45,7 +45,6 @@ config("tma_identity") {
     "TMA_APP_NAME=\"$tma_app_name\"",
     "TMA_APP_ID=\"$tma_app_id\"",
     "TMA_STARTUP_URL=\"$tma_startup_url\"",
-    "TMA_STARTUP_FILE=\"$tma_startup_file\"",
   ]
 }
 
@@ -117,8 +116,20 @@ source_set("tma_shell") {
   }
 }
 
-# Copies the demo/serving HTML next to the built executable so that the shell
-# can load it with a file:// URL without any backend.
+# Copies the application page and every asset beside it next to the built
+# executable, so the shell can load them with file:// URLs and no backend.
+# Dropping a file into tma/resources/ is enough -- there is no list to edit.
+#
+# expand_directory() is allowlisted in the checkout's .gn (scripts/
+# setup_chromium.sh adds this file), because GN otherwise refuses a directory
+# as a source. That allowlist is what stops a stray directory from pulling
+# thousands of files into the build. The listing happens at gn gen time, so a
+# new asset is picked up by the next ./build.sh.
+#
+# The directory is flattened: {{source_file_part}} drops the path, so keep
+# assets at the top level of tma/resources/. Two files with the same name in
+# different subdirectories would produce two rules for one output and fail at
+# ninja time rather than silently overwriting each other.
 #
 # The target name stays "tma_resources" so existing data_deps references and
 # `autoninja ... tma_resources` keep working; only the directory on disk is
@@ -127,7 +138,7 @@ source_set("tma_shell") {
 copy("tma_resources") {
   testonly = true
 
-  sources = [ "resources/index.html" ]
+  sources = expand_directory("resources", true)
 
   outputs = [ "$root_out_dir/${tma_app_name}_resources/{{source_file_part}}" ]
 }

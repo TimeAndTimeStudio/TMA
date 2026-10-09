@@ -41,10 +41,13 @@ constexpr char kWindowSizeSwitch[] = "window-size";
 // restricts app_name to ASCII characters that need no percent-encoding, which
 // is what makes it safe to splice into the fallback URL below too.
 constexpr char kResourcesDirName[] = TMA_APP_NAME "_resources";
+// The packaged entry point. tma.conf's `startup = file` deliberately names no
+// file, so this is the one place that decides what the app page is called.
 constexpr char kEntryFileName[] = "index.html";
 
-// Percent-encoded fallback page, used only when the packaged resources cannot
-// be found on disk.
+// Percent-encoded fallback page, shown when the packaged entry point is not on
+// disk. There is nothing else to fall back to: tma.conf requires startup, and
+// it only ever chooses between this page and a URL.
 constexpr char kMissingResourcesUrl[] =
     "data:text/html;charset=utf-8,"
     "%3C!doctype%20html%3E%3Cmeta%20charset%3Dutf-8%3E"
@@ -54,9 +57,8 @@ constexpr char kMissingResourcesUrl[] =
     "%3Ch1%3E" TMA_APP_NAME "%3C%2Fh1%3E"
     "%3Cp%3ENo%20resources%20found.%20Expected%20"
     "%22" TMA_APP_NAME
-    "_resources%2Findex.html%22%20next%20to%20the%20executable%2C"
-    "%20or%20pass%20a%20URL%20on%20the%20command%20line%2C%20or%20set%20"
-    "startup%20in%20tma.conf.%3C%2Fp%3E"
+    "_resources%2Findex.html%22%20next%20to%20the%20executable%2C%20or%20"
+    "pass%20a%20URL%20on%20the%20command%20line.%3C%2Fp%3E"
     "%3C%2Fbody%3E";
 
 // Content shell registers a resource provider so that net/ can look up
@@ -140,32 +142,20 @@ GURL TmaBrowserMainParts::GetStartupURL() const {
 
   // startup from tma.conf, compiled in by //tma/BUILD.gn. It sits below the
   // command line on purpose: an argument on a given launch is a more specific
-  // statement of intent than a default recorded once at build time.
+  // statement of intent than a value recorded once at build time.
   //
-  // Exactly one of the two is ever set: setup_chromium.sh reads the single
-  // `startup` key in tma.conf -- "url:<url>" or "file:<path>" -- splits it, and
-  // rejects a value carrying neither prefix. So nothing here interprets a
-  // prefix, which also keeps clang from constant-folding the branch away and
-  // failing the build on -Wunreachable-code.
+  // TMA_STARTUP_URL is empty when tma.conf says `startup = file`, so what
+  // follows is either that URL or the packaged page, never both. The format of
+  // the single `startup` key belongs to setup_chromium.sh, which rejects
+  // anything that is neither "file" nor "url:<url>", so nothing here
+  // interprets a prefix (which also keeps clang from constant-folding the
+  // branch away and failing the build on -Wunreachable-code).
   if (TMA_STARTUP_URL[0] != '\0') {
     const GURL url(TMA_STARTUP_URL);
     if (url.is_valid() && url.has_scheme()) {
       return url;
     }
     LOG(WARNING) << "tma.conf startup is not a usable URL: " << TMA_STARTUP_URL;
-  }
-  if (TMA_STARTUP_FILE[0] != '\0') {
-    // A relative path is taken against the executable's directory rather than
-    // the working directory, because a working directory depends on where the
-    // binary happened to be launched from.
-    base::FilePath path(TMA_STARTUP_FILE);
-    if (!path.IsAbsolute() && !exe_dir.empty()) {
-      path = exe_dir.Append(path);
-    }
-    if (base::PathExists(path)) {
-      return net::FilePathToFileURL(path);
-    }
-    LOG(WARNING) << "tma.conf startup file does not exist: " << path.value();
   }
 
   if (!exe_dir.empty()) {

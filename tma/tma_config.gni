@@ -27,12 +27,10 @@ declare_args() {
   # once this is shipped as something other than "tma".
   tma_app_id = "tma"
 
-  # Startup target when the command line carries no URL or path. tma.conf has a
-  # single `startup` key written as "url:<url>" or "file:<path>";
-  # scripts/setup_chromium.sh owns that format and splits it here, so exactly
-  # one of the two is ever non-empty and this file never has to interpret a
-  # prefix. Both empty means <tma_app_name>_resources/index.html next to the
-  # executable.
+  # A URL to open instead of the packaged page; empty when tma.conf says
+  # `startup = file`. setup_chromium.sh owns the format of that single key --
+  # "url:<url>" or the bare word "file" -- and splits it here, so this file
+  # never has to interpret a prefix. The "file" case carries no value at all:
+  # <tma_app_name>_resources/index.html is not something the config may change.
   tma_startup_url = ""
-  tma_startup_file = ""
 }

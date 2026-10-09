@@ -72,25 +72,28 @@ if ! tma_conf_valid_name "$_tma_app_id"; then
   die "tma.conf: app_id '$_tma_app_id' must start with a letter or digit and use only letters, digits, '.', '_' and '-'"
 fi
 
-# startup carries its own kind marker, so this is the one place the format can
-# be checked. Catching a typo here costs a second; catching it later costs a
-# build plus a window that opens the wrong thing, or nothing at all.
+# startup is the one key whose format this script owns, so it is checked here:
+# catching a typo costs a second, catching it later costs a build plus a window
+# that opens the wrong thing, or nothing at all.
 #
-# The split into two GN arguments happens here too rather than in //tma/browser:
-# setup owns the format, and the C++ side only ever sees "a URL" or "a path",
-# never a prefix to interpret.
+# "file" takes no name on purpose. The packaged page is
+# <app_name>_resources/index.html and the config does not get to choose which
+# file that is -- only whether to open it or a URL instead. The split into GN
+# arguments happens here too rather than in //tma/browser, so the C++ side
+# never interprets a prefix (which also keeps clang from constant-folding the
+# branch and failing the build on -Wunreachable-code).
 _tma_startup_url=""
-_tma_startup_file=""
 case "$_tma_startup" in
-  "")             ;;  # empty means the packaged resources page
-  url:?*)         _tma_startup_url="${_tma_startup#url:}" ;;
-  file:?*)        _tma_startup_file="${_tma_startup#file:}" ;;
-  url:|file:)     die "tma.conf: startup '$_tma_startup' has nothing after the prefix" ;;
-  *)              die "tma.conf: startup must be 'url:<url>' or 'file:<path>' -- got '$_tma_startup'" ;;
+  "")      die "tma.conf: startup is required -- set 'file' or 'url:<url>'" ;;
+  file)    ;;  # the packaged page; there is nothing to pass on
+  file:*)  die "tma.conf: startup 'file' takes no name; the packaged page is ${_tma_app_name}_resources/index.html" ;;
+  url:?*)  _tma_startup_url="${_tma_startup#url:}" ;;
+  url:)    die "tma.conf: startup 'url:' has no URL after it" ;;
+  *)       die "tma.conf: startup must be 'file' or 'url:<url>' -- got '$_tma_startup'" ;;
 esac
 
 log "identity: app_name=$_tma_app_name app_id=$_tma_app_id"
-log "startup:  ${_tma_startup:-<packaged resources page>}"
+log "startup:  $_tma_startup"
 
 # --- depot_tools ------------------------------------------------------------
 if [[ ! -d "$DEPOT_TOOLS" ]]; then
@@ -203,6 +206,41 @@ group("tma_hook") {
   deps = [ "//tma:tma" ]
 }
 EOF
+fi
+
+# --- let //tma/BUILD.gn enumerate tma/resources ------------------------------
+# expand_directory() is allowlisted per build file so that a stray directory
+# cannot silently pull thousands of files into the build. //tma/BUILD.gn uses
+# it to copy tma/resources/ -- every asset, not just index.html -- without
+# keeping a second, hand-maintained copy of the file list next to it. Like the
+# root hook above, git checkout --force during pinning drops this patch, so it
+# is re-applied on every run.
+GN_DOTFILE="$CHROMIUM_SRC/.gn"
+EXPAND_MARK="# --- TMA lists tma/resources (added by scripts/setup_chromium.sh) ---"
+if grep -qF "$EXPAND_MARK" "$GN_DOTFILE"; then
+  log "//.gn already allowlists //tma/BUILD.gn for expand_directory()"
+else
+  log "Allowlisting //tma/BUILD.gn for expand_directory() in //.gn"
+  python3 - "$GN_DOTFILE" "$EXPAND_MARK" <<'PY'
+import sys
+
+path, mark = sys.argv[1], sys.argv[2]
+text = open(path, encoding="utf-8").read()
+
+anchor = '      "//components/policy/BUILD.gn",'
+if text.count(anchor) != 1:
+    sys.exit("setup: expand_directory anchor count is %d in %s"
+             % (text.count(anchor), path))
+
+block = (
+    anchor + "\n"
+    "      " + mark + "\n"
+    '      "//tma/BUILD.gn",\n'
+)
+text = text.replace(anchor, block, 1)
+
+open(path, "w", encoding="utf-8").write(text)
+PY
 fi
 
 # --- trim the resource pack that ships ---------------------------------------
@@ -558,7 +596,6 @@ EOF
 GN_ARGS="$GN_ARGS
 tma_app_name = \"$(tma_conf_gn_escape "$_tma_app_name")\"
 tma_app_id = \"$(tma_conf_gn_escape "$_tma_app_id")\"
-tma_startup_file = \"$(tma_conf_gn_escape "$_tma_startup_file")\"
 tma_startup_url = \"$(tma_conf_gn_escape "$_tma_startup_url")\"
 "
 
