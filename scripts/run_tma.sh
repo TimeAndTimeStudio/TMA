@@ -34,20 +34,24 @@ fi
 
 args=()
 
-# Chromium's setuid sandbox helper must be installed setuid root. A checkout
-# build never is, so fall back to --no-sandbox rather than fail at startup.
-SANDBOX="$TMA_OUT/chrome-sandbox"
-if [[ -f "$SANDBOX" ]]; then
-  mode="$(stat -c '%a' "$SANDBOX" 2>/dev/null || true)"
-  if [[ "$mode" != "4755" ]]; then
-    log "note: $SANDBOX has mode $mode (expected 4755); using --no-sandbox."
-    log "      To use the sandbox: sudo chown root:root $SANDBOX && sudo chmod 4755 $SANDBOX"
-    args+=(--no-sandbox)
+# Chromium aborts (LOG(FATAL)) only when the setuid helper exists but is not
+# root-owned, setuid and world-executable — sandbox/linux/suid/client/
+# setuid_sandbox_host.cc:170-176. When the helper is absent entirely it uses
+# the user-namespace sandbox instead, which Fedora allows by default, so no
+# flag is needed at all. Force --no-sandbox for the one case Chromium itself
+# would refuse to start.
+args=()
+for helper in "$TMA_OUT/chrome-sandbox"; do
+  if [[ -f "$helper" ]]; then
+    mode="$(stat -c '%a' "$helper" 2>/dev/null || echo 0)"
+    owner="$(stat -c '%u' "$helper" 2>/dev/null || echo 1)"
+    if [[ "$owner" != "0" ]] || (( (8#$mode & 4000) == 0 )) || (( (8#$mode & 1) == 0 )); then
+      log "note: $helper is mode $mode owner $owner; using --no-sandbox."
+      log "      To use the sandbox: sudo chown root:root $helper && sudo chmod 4755 $helper"
+      args+=(--no-sandbox)
+    fi
   fi
-else
-  log "note: chrome-sandbox helper not found; using --no-sandbox."
-  args+=(--no-sandbox)
-fi
+done
 
 if [[ "${1:-}" == "--" ]]; then
   shift

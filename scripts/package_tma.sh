@@ -66,8 +66,41 @@ cp -f "$EXE"   "$DIST/tma"
 cp -f "$PAK"   "$DIST/content_shell.pak"
 cp -a "$RES"   "$DIST/tma_resources"
 
-# The setuid sandbox helper is optional: without it TMA falls back to
-# --no-sandbox at startup (see scripts/run_tma.sh).
+# Runtime files that must sit next to the binary. Chromium resolves them
+# relative to /proc/self/exe, so a staged copy without them dies at startup
+# with "Invalid file descriptor to ICU data received" — icudtl.dat in
+# particular. This is the same set Chrome's own Linux packaging ships.
+# (.TOC files are link-time artifacts; libtest_*, libVkLayer_* and
+# libVkICD_* are test/validation only, and the qt shims are optional.)
+runtime_files=(
+  icudtl.dat               # ICU data, 10.8 MB — without it the process aborts
+  snapshot_blob.bin        # V8 external startup data (gin/v8_initializer.cc:
+                           #   kSnapshotFileName) — without it: "Error loading
+                           #   V8 startup snapshot file", then the zygote dies
+  v8_context_snapshot.bin  # V8 context snapshot, second of the two
+  libEGL.so                # ANGLE, the GL bindings Chromium uses
+  libGLESv2.so
+  libvk_swiftshader.so     # software Vulkan fallback
+  libvulkan.so.1
+  chrome_crashpad_handler  # crash reporting; missing is survivable
+)
+staged_runtime=0
+for f in "${runtime_files[@]}"; do
+  if [[ -e "$TMA_OUT/$f" ]]; then
+    cp -a "$TMA_OUT/$f" "$DIST/"
+    staged_runtime=$((staged_runtime + 1))
+  else
+    log "  note: $f is not in $TMA_OUT; skipped"
+  fi
+done
+# Locale .pak files. Small, and without them Chromium falls back to en-US.
+if [[ -d "$TMA_OUT/locales" ]]; then
+  rm -rf "${DIST:?}/locales"
+  cp -a "$TMA_OUT/locales" "$DIST/"
+fi
+
+# The setuid sandbox helper is optional: without it Chromium uses the
+# user-namespace sandbox, which Fedora allows by default. See tma.sh.
 if [[ -f "$TMA_OUT/chrome-sandbox" ]]; then
   cp -f "$TMA_OUT/chrome-sandbox" "$DIST/chrome-sandbox"
   chmod 4755 "$DIST/chrome-sandbox"
@@ -81,6 +114,7 @@ stripped="$(bytes "$DIST/tma")"
 log ""
 log "  tma, unstripped   $raw"
 log "  tma, stripped     $stripped"
+log "  runtime files     $staged_runtime (+ locales/ if present)"
 
 if [[ "$do_xz" == 1 ]]; then
   command -v xz >/dev/null || die "xz not found"
@@ -95,7 +129,7 @@ log "  tma_resources     $(du -sh --apparent-size "$DIST/tma_resources" | cut -f
 log ""
 log "total: $(du -sh --apparent-size "$DIST" | cut -f1) in $DIST"
 if [[ -x "$DIST/tma" ]]; then
-  log "run it with: $DIST/tma --no-sandbox   (needs WAYLAND_DISPLAY)"
+  log "run it with: ./tma.sh      (double-clickable; needs a Wayland session)"
 else
   log "unpack first: xz -dk $DIST/tma.xz"
 fi
