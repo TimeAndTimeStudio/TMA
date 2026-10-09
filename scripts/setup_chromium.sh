@@ -43,6 +43,55 @@ CHROMIUM_SRC="${1:-${CHROMIUM_SRC:-$HOME/chromium/src}}"
 DEPOT_TOOLS="${DEPOT_TOOLS:-$HOME/depot_tools}"
 TMA_OUT="${TMA_OUT:-$CHROMIUM_SRC/out/Default}"
 
+# --- application identity from tma.conf --------------------------------------
+# tma.conf is the one place app_name / app_id / startup target are written
+# down. It is read and checked before any download, copy or patch, so that a
+# bad config fails in under a second instead of after a gclient sync; the
+# values become GN arguments further down, next to gn gen. //tma/BUILD.gn
+# cannot read the file itself because the checkout is a copy of this repo made
+# at setup time, so a config-only edit has to reach that gn gen invocation to
+# have any effect at all.
+source "$SCRIPT_DIR/tma_conf.sh"
+
+_tma_app_name="$(tma_conf_get app_name)" || _tma_app_name=""
+_tma_app_id="$(tma_conf_get app_id)" || _tma_app_id=""
+_tma_startup="$(tma_conf_get startup)" || _tma_startup=""
+
+# A missing value falls back to the stock identity, but a present value that is
+# not usable dies here. app_name becomes an output path and is also spliced
+# into the percent-encoded fallback page, so substituting a name silently would
+# resurface much later as a missing file instead of as its cause.
+if [[ -z "$_tma_app_name" ]]; then
+  _tma_app_name="tma"
+elif ! tma_conf_valid_name "$_tma_app_name"; then
+  die "tma.conf: app_name '$_tma_app_name' must start with a letter or digit and use only letters, digits, '.', '_' and '-'"
+fi
+
+[[ -n "$_tma_app_id" ]] || _tma_app_id="$_tma_app_name"
+if ! tma_conf_valid_name "$_tma_app_id"; then
+  die "tma.conf: app_id '$_tma_app_id' must start with a letter or digit and use only letters, digits, '.', '_' and '-'"
+fi
+
+# startup carries its own kind marker, so this is the one place the format can
+# be checked. Catching a typo here costs a second; catching it later costs a
+# build plus a window that opens the wrong thing, or nothing at all.
+#
+# The split into two GN arguments happens here too rather than in //tma/browser:
+# setup owns the format, and the C++ side only ever sees "a URL" or "a path",
+# never a prefix to interpret.
+_tma_startup_url=""
+_tma_startup_file=""
+case "$_tma_startup" in
+  "")             ;;  # empty means the packaged resources page
+  url:?*)         _tma_startup_url="${_tma_startup#url:}" ;;
+  file:?*)        _tma_startup_file="${_tma_startup#file:}" ;;
+  url:|file:)     die "tma.conf: startup '$_tma_startup' has nothing after the prefix" ;;
+  *)              die "tma.conf: startup must be 'url:<url>' or 'file:<path>' -- got '$_tma_startup'" ;;
+esac
+
+log "identity: app_name=$_tma_app_name app_id=$_tma_app_id"
+log "startup:  ${_tma_startup:-<packaged resources page>}"
+
 # --- depot_tools ------------------------------------------------------------
 if [[ ! -d "$DEPOT_TOOLS" ]]; then
   log "Cloning depot_tools into $DEPOT_TOOLS"
@@ -504,41 +553,8 @@ disable_fieldtrial_testing_config = false
 EOF
 )
 
-# --- application identity from tma.conf --------------------------------------
-# tma.conf is the one place app_name / app_id / startup target are written down.
-# They are turned into GN arguments here rather than read
-# from inside //tma/BUILD.gn because the checkout is a copy of this repo made
-# at setup time, so a config-only edit has to reach this gn gen invocation to
-# have any effect at all.
-source "$SCRIPT_DIR/tma_conf.sh"
-
-_tma_app_name="$(tma_conf_get app_name)" || _tma_app_name=""
-_tma_app_id="$(tma_conf_get app_id)" || _tma_app_id=""
-_tma_startup_file="$(tma_conf_get startup_file)" || _tma_startup_file=""
-_tma_startup_url="$(tma_conf_get startup_url)" || _tma_startup_url=""
-
-# A missing value falls back to the stock identity, but a present value that is
-# not usable dies here. app_name becomes an output path and is also spliced
-# into the percent-encoded fallback page, so substituting a name silently would
-# resurface much later as a missing file instead of as its cause.
-if [[ -z "$_tma_app_name" ]]; then
-  _tma_app_name="tma"
-elif ! tma_conf_valid_name "$_tma_app_name"; then
-  die "tma.conf: app_name '$_tma_app_name' must start with a letter or digit and use only letters, digits, '.', '_' and '-'"
-fi
-
-[[ -n "$_tma_app_id" ]] || _tma_app_id="$_tma_app_name"
-if ! tma_conf_valid_name "$_tma_app_id"; then
-  die "tma.conf: app_id '$_tma_app_id' must start with a letter or digit and use only letters, digits, '.', '_' and '-'"
-fi
-
-if [[ -n "$_tma_startup_file" && -n "$_tma_startup_url" ]]; then
-  die "tma.conf: set startup_file or startup_url, not both"
-fi
-
-log "identity: app_name=$_tma_app_name app_id=$_tma_app_id"
-log "startup:  file=${_tma_startup_file:-<default>} url=${_tma_startup_url:-<default>}"
-
+# The values read at the top of this script, escaped for a GN string literal.
+# Everything else about them is already validated by now.
 GN_ARGS="$GN_ARGS
 tma_app_name = \"$(tma_conf_gn_escape "$_tma_app_name")\"
 tma_app_id = \"$(tma_conf_gn_escape "$_tma_app_id")\"

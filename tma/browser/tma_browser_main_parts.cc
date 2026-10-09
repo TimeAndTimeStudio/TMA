@@ -56,7 +56,7 @@ constexpr char kMissingResourcesUrl[] =
     "%22" TMA_APP_NAME
     "_resources%2Findex.html%22%20next%20to%20the%20executable%2C"
     "%20or%20pass%20a%20URL%20on%20the%20command%20line%2C%20or%20set%20"
-    "startup_file%20or%20startup_url%20in%20tma.conf.%3C%2Fp%3E"
+    "startup%20in%20tma.conf.%3C%2Fp%3E"
     "%3C%2Fbody%3E";
 
 // Content shell registers a resource provider so that net/ can look up
@@ -138,17 +138,21 @@ GURL TmaBrowserMainParts::GetStartupURL() const {
   base::FilePath exe_dir;
   base::PathService::Get(base::DIR_EXE, &exe_dir);
 
-  // startup_url / startup_file from tma.conf, compiled in by //tma/BUILD.gn.
-  // These sit below the command line on purpose: an argument on a given launch
-  // is a more specific statement of intent than a default recorded once at
-  // build time. setup_chromium.sh refuses a config that sets both.
+  // startup from tma.conf, compiled in by //tma/BUILD.gn. It sits below the
+  // command line on purpose: an argument on a given launch is a more specific
+  // statement of intent than a default recorded once at build time.
+  //
+  // Exactly one of the two is ever set: setup_chromium.sh reads the single
+  // `startup` key in tma.conf -- "url:<url>" or "file:<path>" -- splits it, and
+  // rejects a value carrying neither prefix. So nothing here interprets a
+  // prefix, which also keeps clang from constant-folding the branch away and
+  // failing the build on -Wunreachable-code.
   if (TMA_STARTUP_URL[0] != '\0') {
     const GURL url(TMA_STARTUP_URL);
     if (url.is_valid() && url.has_scheme()) {
       return url;
     }
-    LOG(WARNING) << "tma.conf startup_url is not a usable URL: "
-                 << TMA_STARTUP_URL;
+    LOG(WARNING) << "tma.conf startup is not a usable URL: " << TMA_STARTUP_URL;
   }
   if (TMA_STARTUP_FILE[0] != '\0') {
     // A relative path is taken against the executable's directory rather than
@@ -161,7 +165,7 @@ GURL TmaBrowserMainParts::GetStartupURL() const {
     if (base::PathExists(path)) {
       return net::FilePathToFileURL(path);
     }
-    LOG(WARNING) << "tma.conf startup_file does not exist: " << path.value();
+    LOG(WARNING) << "tma.conf startup file does not exist: " << path.value();
   }
 
   if (!exe_dir.empty()) {

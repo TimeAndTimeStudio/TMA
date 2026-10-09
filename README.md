@@ -36,14 +36,25 @@ The first run is heavy. After that every step is idempotent.
 `./tma.conf` decides the application's identity and what it opens with:
 
 ```ini
-app_name = tma   # the binary, and the <app_name>_resources/ directory beside it
-app_id = tma     # Wayland xdg_toplevel app_id
-startup_file =   # path opened when the command line carries no argument
-startup_url =    # ...or a URL; set at most one of the two
+app_name = tma
+app_id = tma
+startup =
 ```
 
 `app_name` and `app_id` must start with a letter or digit and use only
 letters, digits, `.` `_` and `-`.
+
+`startup` is what the window opens with when the command line says nothing, and
+its prefix says which kind of thing it is:
+
+```ini
+startup = url:https://example.com
+startup = file:/path/to/page.html
+```
+
+Leave it empty for `<app_name>_resources/index.html` beside the binary. A
+relative `file:` path is resolved against the binary's directory, not the
+working directory.
 
 There is deliberately no window title. The top bar carries the three caption
 buttons and no text, so a page's `<title>` has nowhere to appear and is
@@ -54,9 +65,9 @@ The file is read at *setup* time and baked into the binary, so re-run
 configured default:
 
 ```bash
-build/tma --url=https://example.com
-build/tma https://example.com
-build/tma /path/to/page.html
+build/<app_name> --url=https://example.com
+build/<app_name> https://example.com
+build/<app_name> /path/to/page.html
 ```
 
 ## Where the output goes

@@ -44,8 +44,8 @@ config("tma_identity") {
   defines = [
     "TMA_APP_NAME=\"$tma_app_name\"",
     "TMA_APP_ID=\"$tma_app_id\"",
-    "TMA_STARTUP_FILE=\"$tma_startup_file\"",
     "TMA_STARTUP_URL=\"$tma_startup_url\"",
+    "TMA_STARTUP_FILE=\"$tma_startup_file\"",
   ]
 }
 
