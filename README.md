@@ -55,10 +55,12 @@ URL is the only thing the window will ever open. An empty value, a `file`
 keyword left over from an older config, or a URL with no scheme are each
 rejected by `./build.sh` in under a second.
 
-**TMA takes no arguments at all.** No `--url`, no positional argument, no
-`--window-size`, no `--fullscreen` — each was removed so that what a binary
-does follows from `tma.conf` alone and nothing about how it was invoked. What
-the window opens and how small it may get are decided before the link.
+**TMA takes no arguments at all, and refuses to start if you pass one.** No
+`--url`, no positional argument, no `--window-size`, no `--fullscreen`, and no
+file path either — `main()` exits with an error naming what you passed, before
+Chromium is initialised, rather than quietly ignoring it. What a binary does
+follows from `tma.conf` alone and nothing about how it was invoked; what the
+window opens and how small it may get are decided before the link.
 
 There is deliberately no window title. The top bar carries the three caption
 buttons and no text, so a page's `<title>` has nowhere to appear and is

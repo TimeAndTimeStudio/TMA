@@ -20,8 +20,12 @@ TmaMainDelegate::~TmaMainDelegate() = default;
 std::optional<int> TmaMainDelegate::BasicStartupComplete() {
   // Content shell starts a remote DevTools HTTP server on 127.0.0.1 unless it
   // is explicitly asked not to. TMA is a display shell, so the server is never
-  // started (see TmaBrowserMainParts::PreMainMessageLoopRun()); this is only a
-  // place to keep any future process-wide command line policy.
+  // started (see TmaBrowserMainParts::PreMainMessageLoopRun()).
+  //
+  // Arguments from a human are already gone: main() refuses anything that is
+  // not Chromium's own --type=, before ContentMain and therefore before this
+  // runs. What is logged below is therefore what Chromium itself is running
+  // this process with, which for a helper means its --type and nothing else.
   const base::CommandLine* command_line =
       base::CommandLine::ForCurrentProcess();
   VLOG(1) << "TMA starting with command line: "
