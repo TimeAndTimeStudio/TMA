@@ -98,6 +98,61 @@ build/<app_name>
 Needs a Wayland session. If your shell has no `WAYLAND_DISPLAY`, prefix
 `env WAYLAND_DISPLAY=wayland-0`.
 
+## Network
+
+Every host TMA or its build reaches. No telemetry, no update check, no backend.
+
+### `./build.sh deps`
+
+Whatever `/etc/yum.repos.d/` is configured for — on stock Fedora that starts at
+`https://mirrors.fedoraproject.org/metalink?...` and then the mirror it resolves
+to. The script carries no URL of its own; it only runs `sudo dnf install`.
+
+### `./build.sh setup`
+
+| Host | What |
+|---|---|
+| `chromium.googlesource.com/chromium/tools/depot_tools.git` | cloned once |
+| `chromium.googlesource.com/chromium/src.git` | the tag in `CHROMIUM_VERSION` |
+| `*.googlesource.com` — webrtc, skia, dawn, pdfium, quiche, boringssl, swiftshader, aomedia, android | the git deps listed in `src/DEPS` |
+| `chrome-infra-packages.appspot.com` | CIPD packages |
+| `storage.googleapis.com/<bucket>/...` | GCS blobs: the clang toolchain (`chromium-browser-clang`, 427 MB), the Debian sysroot (`chrome-linux-sysroot`), node, clang-format, ... |
+
+`--no-history` makes every git fetch shallow; `--jobs=4` caps parallel fetches
+because googlesource answers HTTP 429 above a shared quota. `cat
+$HOME/chromium/.gclient_entries` lists exactly what landed on your machine.
+
+**Remote Build Execution is not used.** autoninja runs `siso ninja --offline`
+because `use_remoteexec` is unset — that is what the `offline mode` line in the
+build output means. Every step is compiled here; no RBE or remote cache is
+contacted.
+
+### `./build.sh build`, `package`, `run`
+
+Nothing. The build is local, packaging is `cp` / `strip` / `xz`.
+
+### Running TMA
+
+Nothing either. The only IPC is the Wayland socket and, over D-Bus,
+`org.freedesktop.appearance` (prefers-color-scheme) and
+`org.freedesktop.portal.FileChooser` (the file dialog) — both local, neither a
+URL. The packaged page ships no external resources and only calls `fetch()` when
+you submit a URL in its box.
+
+Two things do reach the network, and both are yours:
+
+```ini
+# opens that URL once, at startup
+startup = url:https://example.com
+```
+
+```bash
+build/<app_name> --url=https://example.com   # or a bare URL/path argument
+```
+
+`git push` to `github.com/TimeAndTimeStudio/TMA` is run by hand; nothing in
+`./build.sh` talks to GitHub.
+
 ## Files
 
 ```
