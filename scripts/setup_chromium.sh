@@ -460,6 +460,17 @@ rtc_use_pipewire = false
 
 # --- WebGPU -------------------------------------------------------------------
 # //third_party/dawn plus its SPIR-V tooling, ~740 edges.
+#
+# use_dawn already defaults true on Linux (ui/gl/features.gni) and Dawn's own
+# backends -- Vulkan, desktop GL, GLES, SwiftShader -- all default on
+# (third_party/dawn/scripts/dawn_features.gni), so the WebGPU implementation is
+# in the graph either way. What this one adds is Skia's Dawn backend, and it is
+# not optional: on Linux gpu/command_buffer/service/webgpu_decoder_impl.cc only
+# offers WebGPU a real backend when the Skia context is Vulkan-backed, and
+# Skia on Vulkan is a path that does not exist while Skia's Dawn side is
+# compiled out. Ask for a WebGPU adapter otherwise and you get Null, i.e. no
+# adapter at all.
+skia_use_dawn = true
 
 # --- remoting -----------------------------------------------------------------
 # Chrome Remote Desktop and its crashpad component.
@@ -560,16 +571,30 @@ enable_expensive_dchecks = false
 partition_alloc_dcheck_always_on = false
 allow_avx512 = false
 
-# Vulkan backends ANGLE does not need (TMA renders with GL on Wayland).
-angle_enable_vulkan = false
-angle_shared_libvulkan = false
-angle_use_custom_libvulkan = false
+# --- ANGLE --------------------------------------------------------------------
+# All three Vulkan switches were set false on the assumption that TMA renders
+# with GL on Wayland. WebGL does reach the screen that way, and still does on a
+# host with no Vulkan -- but ANGLE's Vulkan backend is the path that puts
+# WebGL on Vulkan where Vulkan exists, and turning it off also turns off
+# angle_enable_swiftshader (angle.gni: it is derived from angle_enable_vulkan),
+# which is ANGLE's own software Vulkan for a machine with nothing else.
+#
+# Which backend is used is still decided at run time from what the host has,
+# so these buy the faster path rather than force it.
+angle_enable_vulkan = true
+angle_shared_libvulkan = true
+angle_use_custom_libvulkan = true
+
+# Development tooling a display shell never loads: ANGLE's WebGPU bridge,
+# Vulkan validation layers, perfetto tracing, and the debug-layer asserts.
 angle_enable_wgpu = false
 angle_enable_vulkan_validation_layers = false
 angle_enable_perfetto = false
 angle_debug_layers_enabled = false
 angle_assert_always_on = false
-skia_use_dawn = false
+
+# ASTC codec sources for SwiftShader only -- the software renderer runs
+# without them.
 swiftshader_enable_astc = false
 
 # on-device AI / ML (Chromium documents these as "exclude ... due to binary size")
