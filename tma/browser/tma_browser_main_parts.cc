@@ -32,7 +32,6 @@ namespace tma {
 
 namespace {
 
-constexpr char kUrlSwitch[] = "url";
 constexpr char kWindowSizeSwitch[] = "window-size";
 
 // Spliced together by string-literal concatenation from TMA_APP_NAME, so that
@@ -109,20 +108,11 @@ GURL TmaBrowserMainParts::GetStartupURL() const {
   const base::CommandLine* command_line =
       base::CommandLine::ForCurrentProcess();
 
-  if (command_line->HasSwitch(kUrlSwitch)) {
-    const std::string value = command_line->GetSwitchValueASCII(kUrlSwitch);
-    GURL url(value);
-    if (url.is_valid() && url.has_scheme()) {
-      return url;
-    }
-    const base::FilePath path =
-        base::MakeAbsoluteFilePath(base::FilePath(value));
-    if (!path.empty()) {
-      return net::FilePathToFileURL(path);
-    }
-    LOG(WARNING) << "Ignoring invalid --" << kUrlSwitch << "=" << value;
-  }
-
+  // A bare command line argument wins over tma.conf. There is deliberately no
+  // --url= switch as well: two spellings of one idea means two things to
+  // document and two things to get wrong, and a bare argument covers
+  // everything a switch would -- both a URL and a path have a scheme or a
+  // leading slash, and neither needs a flag in front of it.
   const base::CommandLine::StringVector& args = command_line->GetArgs();
   if (!args.empty()) {
     const std::string& first = args[0];

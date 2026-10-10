@@ -68,6 +68,10 @@ export PATH="$DEPOT_TOOLS:$PATH"
 command -v autoninja >/dev/null || die "autoninja not found; is depot_tools on PATH?"
 
 log "autoninja -C $TMA_OUT tma"
-autoninja -C "$TMA_OUT" tma
+# siso announces that it is running with --offline on every invocation. That is
+# the only mode TMA has -- use_remoteexec is forced off in the GN args, see
+# scripts/setup_chromium.sh -- so the line is pure noise. Drop exactly that line
+# from stderr and leave everything else, including failures, untouched.
+autoninja -C "$TMA_OUT" tma 2> >(grep -vxF -- "offline mode" >&2)
 
 log "Built $TMA_OUT/$conf_app"

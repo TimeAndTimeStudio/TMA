@@ -72,6 +72,10 @@ bytes() { # bytes <file> -> "12345678 B (117.7 MB)"
 
 mkdir -p "$DIST"
 rm -rf "${DIST:?}/$RES_DIR"
+# Older builds staged a locales/ directory here. Nothing produces one any more
+# (out/Default/locales is empty and no build rule writes to it), so clear any
+# copy left behind rather than ship an empty folder.
+rm -rf "${DIST:?}/locales"
 
 log "staging -> $DIST"
 cp -f "$EXE"   "$DIST/$APP"
@@ -94,10 +98,16 @@ runtime_files=(
                            #   kSnapshotFileName) — without it: "Error loading
                            #   V8 startup snapshot file", then the zygote dies
   v8_context_snapshot.bin  # V8 context snapshot, second of the two
-  libEGL.so                # ANGLE, the GL bindings Chromium uses
+  # ANGLE and its software-Vulkan fallback. Chromium dlopen()s these rather
+  # than linking them, so they are absent from `ldd` and are only mapped into
+  # the --type=gpu-process. Which pair is actually used depends on the host:
+  # a machine with working Mesa OpenGL maps /usr/lib64/libEGL.so.1 instead
+  # and never loads these at all, which is why they cannot be dropped --
+  # the next machine may have neither.
+  libEGL.so                # ANGLE, Chromium's own GL layer
   libGLESv2.so
-  libvk_swiftshader.so     # software Vulkan fallback
-  libvulkan.so.1
+  libvk_swiftshader.so     # SwiftShader: software (CPU) Vulkan renderer
+  libvulkan.so.1           # the Vulkan loader SwiftShader plugs into
   chrome_crashpad_handler  # crash reporting; missing is survivable
 )
 staged_runtime=0
@@ -109,12 +119,6 @@ for f in "${runtime_files[@]}"; do
     log "  note: $f is not in $TMA_OUT; skipped"
   fi
 done
-# Locale .pak files. Small, and without them Chromium falls back to en-US.
-if [[ -d "$TMA_OUT/locales" ]]; then
-  rm -rf "${DIST:?}/locales"
-  cp -a "$TMA_OUT/locales" "$DIST/"
-fi
-
 # The setuid sandbox helper is optional: without it Chromium uses the
 # Linux user-namespace sandbox, which Fedora allows by default
 # (kernel.unprivileged_userns_clone does not exist outside Debian/Ubuntu, and
@@ -133,7 +137,7 @@ stripped="$(bytes "$DIST/$APP")"
 log ""
 log "  $APP, unstripped   $raw"
 log "  $APP, stripped     $stripped"
-log "  runtime files     $staged_runtime (+ locales/ if present)"
+log "  runtime files     $staged_runtime"
 
 if [[ "$do_xz" == 1 ]]; then
   command -v xz >/dev/null || die "xz not found"

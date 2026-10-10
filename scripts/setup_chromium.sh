@@ -394,6 +394,13 @@ fi
 #                              needs a source patch.
 #
 GN_ARGS=$(cat <<'EOF'
+# --- where the build runs ----------------------------------------------------
+# TMA never uses Remote Build Execution. Set explicitly rather than left to the
+# default, because this is what makes autoninja pass `siso --offline`: no RBE
+# and no remote cache are contacted, and every step compiles on this machine.
+# See README, Network.
+use_remoteexec = false
+
 # --- build type ---------------------------------------------------------------
 is_debug = false
 symbol_level = 0

@@ -37,12 +37,11 @@ class TmaBrowserMainParts : public content::ShellBrowserMainParts {
 
  private:
   // URL to open in the first window. Resolution order:
-  //   1. --url=<url>
-  //   2. first non-switch command line argument (URL or file path)
-  //   3. startup from tma.conf when it is a URL (startup = url:...)
-  //   4. file://<exe dir>/<app_name>_resources/index.html, which is what
+  //   1. first non-switch command line argument (URL or file path)
+  //   2. startup from tma.conf when it is a URL (startup = url:...)
+  //   3. file://<exe dir>/<app_name>_resources/index.html, which is what
   //      startup = file means
-  //   5. an inline data: URL describing the missing resource
+  //   4. an inline data: URL describing the missing resource
   GURL GetStartupURL() const;
 
   // Initial window size from --window-size=<width>x<height>, else the default.

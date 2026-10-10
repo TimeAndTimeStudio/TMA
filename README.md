@@ -73,7 +73,6 @@ The file is read at *setup* time and baked into the binary, so re-run
 configured value:
 
 ```bash
-build/<app_name> --url=https://example.com
 build/<app_name> https://example.com
 build/<app_name> /path/to/page.html
 ```
@@ -147,7 +146,7 @@ startup = url:https://example.com
 ```
 
 ```bash
-build/<app_name> --url=https://example.com   # or a bare URL/path argument
+build/<app_name> https://example.com   # a URL or a path, with no flag
 ```
 
 `git push` to `github.com/TimeAndTimeStudio/TMA` is run by hand; nothing in
