@@ -80,9 +80,10 @@ int TmaBrowserMainParts::PreMainMessageLoopRun() {
 }
 
 void TmaBrowserMainParts::InitializeMessageLoopContext() {
-  // The window opens at the default size and nothing can change it: the
-  // --window-size switch is deliberately gone, and the floor comes from
-  // tma.conf's min_width / min_height (see TmaView::GetMinimumSize()).
+  // The window opens at min_width x min_height from tma.conf -- which is also
+  // the floor, so there is no size between what opens and what may be asked
+  // for -- and nothing can change it: the --window-size switch is deliberately
+  // gone.
   content::Shell::CreateNewWindow(
       browser_context(), GetStartupURL(), /*site_instance=*/nullptr,
       gfx::Size(kDefaultWindowWidth, kDefaultWindowHeight));

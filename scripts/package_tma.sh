@@ -72,6 +72,12 @@ rm -rf "${DIST:?}/${APP}_resources" "${DIST:?}/locales"
 # (out/Default/locales is empty and no build rule writes to it), so clear any
 # copy left behind rather than ship an empty folder.
 rm -rf "${DIST:?}/locales"
+# Earlier builds staged ANGLE's shared libEGL.so / libGLESv2.so here. runtime_files
+# below no longer lists them -- the GPU process never loads either (ANGLE is
+# linked in, and Mesa's system libEGL is what --use-angle=vulkan keeps out) --
+# and a package directory is never wiped, so without this they would ride along
+# in every later build as dead weight.
+rm -f "${DIST:?}/libEGL.so" "${DIST:?}/libGLESv2.so"
 
 log "staging -> $DIST"
 cp -f "$EXE"   "$DIST/$APP"
@@ -89,14 +95,17 @@ runtime_files=(
                            #   kSnapshotFileName) — without it: "Error loading
                            #   V8 startup snapshot file", then the zygote dies
   v8_context_snapshot.bin  # V8 context snapshot, second of the two
-  # ANGLE and its software-Vulkan fallback. Chromium dlopen()s these rather
-  # than linking them, so they are absent from `ldd` and are only mapped into
-  # the --type=gpu-process. Which pair is actually used depends on the host:
-  # a machine with working Mesa OpenGL maps /usr/lib64/libEGL.so.1 instead
-  # and never loads these at all, which is why they cannot be dropped --
-  # the next machine may have neither.
-  libEGL.so                # ANGLE, Chromium's own GL layer
-  libGLESv2.so
+  # ANGLE's libEGL.so and libGLESv2.so are not shipped. ANGLE is not optional
+  # -- gpu/ipc/service/gpu_init.cc:516 initializes GL on every GPU process
+  # start -- but it is linked into the binary rather than loaded, so the
+  # process maps neither these two copies nor Mesa's /usr/lib64/libEGL.so.1.
+  # Read off /proc/<pid>/maps with WebGL off and --use-angle=vulkan set: no
+  # libEGL, no libGL, no libGLdispatch -- Vulkan loaders, Vulkan ICDs and what
+  # those link in, and that is all. That also retires the old "the next
+  # machine may have neither" reasoning: no host maps them to be without.
+  #
+  # SwiftShader and its loader do stay. Chromium dlopen()s both rather than
+  # linking them, so they are absent from `ldd`.
   libvk_swiftshader.so     # SwiftShader: software (CPU) Vulkan renderer
   libvulkan.so.1           # the Vulkan loader SwiftShader plugs into
   chrome_crashpad_handler  # crash reporting; missing is survivable

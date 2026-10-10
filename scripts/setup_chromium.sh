@@ -572,18 +572,22 @@ partition_alloc_dcheck_always_on = false
 allow_avx512 = false
 
 # --- ANGLE --------------------------------------------------------------------
-# All three Vulkan switches were set false on the assumption that TMA renders
-# with GL on Wayland. WebGL does reach the screen that way, and still does on a
-# host with no Vulkan -- but ANGLE's Vulkan backend is the path that puts
-# WebGL on Vulkan where Vulkan exists, and turning it off also turns off
-# angle_enable_swiftshader (angle.gni: it is derived from angle_enable_vulkan),
-# which is ANGLE's own software Vulkan for a machine with nothing else.
+# ANGLE cannot be left out: gpu/ipc/service/gpu_init.cc:516 initializes GL on
+# every GPU process start, and there is no switch that skips that call without
+# also losing WebGPU -- --use-gl=disabled leaves the page reporting "Failed to
+# create WebGPU Context Provider". So ANGLE stays built, and the backend of
+# that call is chosen at run time by --use-angle=vulkan, injected by
+# TmaMainDelegate. It resolves to Vulkan instead of system EGL, which is what
+# keeps Mesa's stack (libEGL.so.1, libEGL_mesa, libgallium, libLLVM) out of
+# the process.
 #
-# Which backend is used is still decided at run time from what the host has,
-# so these buy the faster path rather than force it.
-angle_enable_vulkan = true
-angle_shared_libvulkan = true
-angle_use_custom_libvulkan = true
+# The Vulkan switches are not written down here. angle.gni already computes
+# angle_enable_vulkan, angle_shared_libvulkan and angle_use_custom_libvulkan
+# to the values this build would have set on Linux -- angle_use_wayland
+# defaults to true, which is what angle_enable_vulkan turns on -- so stating
+# them again would only buy a rebuild for a sentence. WebGPU reaches Vulkan
+# through skia_use_dawn and --enable-features=Vulkan, neither of which is
+# ANGLE's.
 
 # Development tooling a display shell never loads: ANGLE's WebGPU bridge,
 # Vulkan validation layers, perfetto tracing, and the debug-layer asserts.

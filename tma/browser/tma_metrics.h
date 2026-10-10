@@ -35,11 +35,13 @@ inline constexpr int kResizeAreaCornerSize = 16;
 // the top-right corner stay available to kResizeHitThickness.
 inline constexpr int kCaptionButtonWidth = 34;
 
-// Default window size. The floor is not here: min_width / min_height live in
-// tma.conf and reach TmaView::GetMinimumSize() as TMA_MIN_WIDTH /
-// TMA_MIN_HEIGHT, because that is where the rest of the shape is written down.
-inline constexpr int kDefaultWindowWidth = 1280;
-inline constexpr int kDefaultWindowHeight = 800;
+// Opening size, taken from min_width / min_height in tma.conf and baked in by
+// //tma/BUILD.gn. The same pair is the floor for the client area -- see
+// TmaView::GetMinimumSize() -- so the window starts at the size it is allowed
+// to shrink to. Nothing opens larger than the shape tma.conf asked for, and
+// nothing can be asked to open smaller than it does.
+inline constexpr int kDefaultWindowWidth = TMA_MIN_WIDTH;
+inline constexpr int kDefaultWindowHeight = TMA_MIN_HEIGHT;
 
 }  // namespace tma
 

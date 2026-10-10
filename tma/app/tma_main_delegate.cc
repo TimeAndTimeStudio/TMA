@@ -28,8 +28,10 @@ namespace {
 // Wayland needs no switch at all: X11 is not compiled in (see the GN args), so
 // there is no second platform for the shell to drift onto.
 //
-// Three switches reach Vulkan, one takes WebGL away. Switch 2 is the "only" in
-// Wayland + Vulkan only -- native Vulkan is requested as a switch value the
+// Three switches reach Vulkan -- the feature, the blocklist-proof
+// implementation, and the backend of the GL call the GPU process makes anyway
+// -- and one takes WebGL away. Switch 2 is the "only"
+// in Wayland + Vulkan only -- native Vulkan is requested as a switch value the
 // GPU blocklist may not rescind, rather than as a feature default it can.
 void ConfigureTmaGraphics(base::CommandLine* command_line) {
   // 1. features::kVulkan. Disabled by default on every platform but Android
@@ -67,13 +69,25 @@ void ConfigureTmaGraphics(base::CommandLine* command_line) {
   //    not permitted to override.
   command_line->AppendSwitchASCII("use-vulkan", "native");
 
-  // 3. --use-angle=vulkan. WebGPU is the only rendering API TMA offers, but
-  //    ANGLE is still linked in and still picks a backend of its own --
-  //    gl/init/gl_display_initializer.cc reads this switch, and gl_factory.cc
-  //    infers --use-gl=angle from its presence, so that one is not needed.
-  //    Left unset, ANGLE defaults to Mesa's desktop GL, which would pull a
-  //    second GPU API into a shell that claims one. Keeping it makes any ANGLE
-  //    context that does get created Vulkan, never desktop GL.
+  // 3. --use-angle=vulkan, which decides the backend of a call TMA cannot
+  //    avoid. gpu/ipc/service/gpu_init.cc:516 initializes GL on every GPU
+  //    process start; there is no switch that skips that call without also
+  //    taking WebGPU with it -- measured on this host, --use-gl=disabled
+  //    leaves the page reporting "Failed to create WebGPU Context Provider".
+  //    So the only choice is what that mandatory call resolves to.
+  //
+  //    Without this switch the default on Linux is system EGL and the process
+  //    maps Mesa's whole stack beside Vulkan: libEGL.so.1, libEGL_mesa,
+  //    libgallium, libLLVM, libGLdispatch. With it the call goes to ANGLE's
+  //    Vulkan backend and no GL library is mapped at all -- no libEGL, no
+  //    libGL, no libGLdispatch -- only Vulkan loaders, Vulkan ICDs and what
+  //    those link in (lavapipe brings libgallium and libLLVM). gl_factory.cc
+  //    also infers --use-gl=angle from its presence, so that switch is not
+  //    needed.
+  //
+  //    This is not WebGL's switch -- WebGL is off (switch 4). It is the switch
+  //    that keeps the one API TMA does not claim out of the process, which is
+  //    why it stays.
   command_line->AppendSwitchASCII("use-angle", "vulkan");
 
   // 4. --disable-webgl. content/browser/web_contents/web_contents_impl.cc
