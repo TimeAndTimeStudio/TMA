@@ -59,10 +59,28 @@ export PATH="$DEPOT_TOOLS:$PATH"
 command -v autoninja >/dev/null || die "autoninja not found; is depot_tools on PATH?"
 
 log "autoninja -C $TMA_OUT tma"
-# siso announces that it is running with --offline on every invocation. That is
-# the only mode TMA has -- use_remoteexec is forced off in the GN args, see
-# scripts/setup_chromium.sh -- so the line is pure noise. Drop exactly that line
-# from stderr and leave everything else, including failures, untouched.
-autoninja -C "$TMA_OUT" tma 2> >(grep -vxF -- "offline mode" >&2)
+# siso announces the mode it is running in on every invocation, and all three
+# lines are noise: use_remoteexec is forced off in the GN args (see
+# scripts/setup_chromium.sh), so --offline is the only mode there is, and
+# fast local follows RBE out of the build.
+#
+# A plain `grep -vxF -- "offline mode"` never dropped the first one, which is
+# why it kept appearing. On a terminal siso writes, as bytes:
+#
+#   ESC[31;1m offline mode CR LF      <- red + bold, then reset
+#   ESC[0m    CR ESC[K ninja: ...     <- reset sits on the *next* line
+#
+# so the line is neither the text `offline mode` nor free of the colour code
+# and the CR, and -x matches nothing. Worse, the colour is set before the
+# newline and cleared after it: whatever this script prints next -- log "Built"
+# below -- races the reset and lands in red. Taking the line together with its
+# colour code means red is never switched on, so there is nothing left to
+# leak, and the reset that follows is harmless on its own. When stderr is not a
+# terminal siso prints the same first line bare, which the same pattern drops.
+#
+# Everything else, including failures, passes through untouched.
+autoninja -C "$TMA_OUT" tma 2> >(
+  grep -vP '^(?:\e\[[0-9;]*m)?(?:offline mode|disable fast local for non-interactive:.*| use `--fast_local`.*)\r?$' >&2
+)
 
 log "Built $TMA_OUT/$conf_app"
