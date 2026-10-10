@@ -499,6 +499,28 @@ enable_media_remoting = false
 enable_media_remoting_rpc = false
 
 # --- platform features TMA does not have -------------------------------------
+# The extensions platform: already absent, and not settable here.
+#
+# Absent -- nothing to turn off. `gn path` reports no non-data path from
+# //content/shell:content_shell to //extensions/browser or
+# //chrome/browser/extensions, content/ carries no BUILDFLAG(ENABLE_EXTENSIONS)
+# reference at all, and the linked binary has no extension code in it:
+#   nm -C out/Default/tma | grep 'extensions::' | grep -v icu   ->  0
+#   (the 10 Extension* hits are ANGLE's gl::*ExtensionSettings and
+#    spvtools::ExtensionSet)
+# out/Default/obj/extensions holds one object file, constants_impl.o, left
+# over from //extensions/common:common_constants.
+#
+# Not settable: enable_extensions = false does not survive gn gen. Two
+# upstream asserts stop it.
+#   ui/webui/webui_features.gni:58  assert(enable_extensions_core) -- runs
+#     whenever enable_webui_ntp, which is on for linux: "NTP relies on
+#     chrome.metricsPrivate, which is an extensions API". Following it down
+#     with enable_extensions_core = false only moves the failure to
+#     chrome/common/BUILD.gn:314 assert(enable_extensions), reached from
+#     chrome/test/BUILD.gn:270, and //extensions/* asserts it as well.
+# So the flag documents a state the build is already in rather than
+# producing one.
 enable_vr = false
 enable_openxr = false
 enable_hosted_apps = false
