@@ -28,9 +28,31 @@ bool LaunchedByChromium(Args args) {
   return false;
 }
 
-// Checked on raw argv rather than on base::CommandLine so that this sees
-// exactly what was typed: Chromium appends switches to its own command line
-// as it starts up, and none of those are a human asking for something.
+// The only two things a human may ask for, and both report the same number
+// because TMA has no version of its own: it is a shell with no code of
+// consequence outside //tma, so what identifies a build is the Chromium it
+// embeds. --version names the product alongside it; --version-browser is the
+// bare value, for anything that means to compare rather than read.
+//
+// Matched against raw argv rather than base::CommandLine so that this sees
+// exactly what was typed: Chromium appends switches to its own command line as
+// it starts up, and none of those are a request anyone made of TMA.
+bool PrintVersion(Args args) {
+  if (args.size() != 1) {
+    return false;
+  }
+  const std::string_view arg(args.front());
+  if (arg == "--version") {
+    std::printf("%s %s\n", TMA_APP_NAME, TMA_CHROMIUM_VERSION);
+    return true;
+  }
+  if (arg == "--version-browser") {
+    std::printf("Chromium %s\n", TMA_CHROMIUM_VERSION);
+    return true;
+  }
+  return false;
+}
+
 void RefuseArguments(Args args) {
   std::string joined;
   bool first = true;
@@ -42,10 +64,10 @@ void RefuseArguments(Args args) {
     joined += arg;
   }
   std::fprintf(stderr,
-               "error: TMA takes no arguments; refused '%s'.\n"
-               "       TMA exits here rather than starting: no window opens\n"
-               "       and this argument is never read. TMA is configured\n"
-               "       before it is built, never from the command line.\n",
+               "error: TMA refused '%s'.\n"
+               "       The only flags TMA accepts are --version and\n"
+               "       --version-browser. TMA exits here rather than starting:\n"
+               "       no window opens and this argument is never read.\n",
                joined.c_str());
 }
 
@@ -58,6 +80,9 @@ int main(int argc, const char** argv) {
   const Args tail = all.subspan(1);
 
   if (!tail.empty() && !LaunchedByChromium(tail)) {
+    if (PrintVersion(tail)) {
+      return 0;
+    }
     RefuseArguments(tail);
     return 2;
   }

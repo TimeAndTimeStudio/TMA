@@ -38,4 +38,12 @@ declare_args() {
   # The strip TMA draws along the top adds to the height on top of this.
   tma_min_width = 320
   tma_min_height = 200
+
+  # The Chromium this binary embeds, reported by --version and
+  # --version-browser. TMA has no version number of its own: it is a shell
+  # with no code of consequence outside //tma, so what identifies a build is
+  # the Chromium underneath it. setup_chromium.sh overwrites this with the tag
+  # it actually pinned the checkout to; the default mirrors //CHROMIUM_VERSION
+  # for a bare `gn gen`.
+  tma_chromium_version = "155.0.8059.39"
 }

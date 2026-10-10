@@ -615,6 +615,9 @@ tma_app_name = \"$(tma_conf_gn_escape "$_tma_app_name")\"
 tma_app_id = \"$(tma_conf_gn_escape "$_tma_app_id")\"
 tma_startup_url = \"$(tma_conf_gn_escape "$_tma_startup_url")\"tma_min_width = $_tma_min_width
 tma_min_height = $_tma_min_height
+# The tag the checkout was pinned to two screens ago, which is what the
+# compiled Chromium actually is -- not merely what CHROMIUM_VERSION asked for.
+tma_chromium_version = \"$CHROMIUM_TAG\"
 "
 
 log "gn gen $TMA_OUT"

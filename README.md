@@ -55,12 +55,13 @@ URL is the only thing the window will ever open. An empty value, a `file`
 keyword left over from an older config, or a URL with no scheme are each
 rejected by `./build.sh` in under a second.
 
-**TMA takes no arguments at all, and refuses to start if you pass one.** No
-`--url`, no positional argument, no `--window-size`, no `--fullscreen`, and no
-file path either — `main()` exits with an error naming what you passed, before
-Chromium is initialised, rather than quietly ignoring it. What a binary does
-follows from `tma.conf` alone and nothing about how it was invoked; what the
-window opens and how small it may get are decided before the link.
+**TMA takes no arguments except `--version` and `--version-browser`** (see
+[Run](#run)), and refuses to start if you pass anything else. No `--url`, no
+positional argument, no `--window-size`, no `--fullscreen`, and no file path
+either — `main()` exits with an error naming what you passed, before Chromium
+is initialised, rather than quietly ignoring it. What a binary does follows
+from `tma.conf` alone and nothing about how it was invoked; what the window
+opens and how small it may get are decided before the link.
 
 There is deliberately no window title. The top bar carries the three caption
 buttons and no text, so a page's `<title>` has nowhere to appear and is
@@ -87,6 +88,16 @@ build/<app_name>
 
 Needs a Wayland session. If your shell has no `WAYLAND_DISPLAY`, prefix
 `env WAYLAND_DISPLAY=wayland-0`.
+
+Two flags are accepted, and both report the Chromium this build embeds — TMA
+has no version number of its own, it is a shell:
+
+```bash
+build/<app_name> --version           # tma 155.0.8059.39
+build/<app_name> --version-browser   # Chromium 155.0.8059.39
+```
+
+`--version-browser` is the bare number, for scripts that mean to compare it.
 
 ## Network
 
@@ -144,7 +155,7 @@ not TMA's; TMA itself issues none.
 ## Files
 
 ```
-CHROMIUM_VERSION    the Chromium tag TMA builds against
+CHROMIUM_VERSION    the Chromium tag TMA builds against; --version reports it
 build.sh            the whole workflow
 tma.conf            application name, id, startup URL and window floor
 tma/browser/        the frame: hit-test, caption buttons, strip

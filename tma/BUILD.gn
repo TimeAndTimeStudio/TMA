@@ -29,6 +29,8 @@ assert(tma_app_name != "", "app_name in tma.conf is empty.")
 assert(tma_startup_url != "", "startup in tma.conf must be 'url:<url>'.")
 assert(tma_min_width > 0 && tma_min_height > 0,
        "min_width / min_height in tma.conf must be positive integers.")
+assert(tma_chromium_version != "",
+       "CHROMIUM_VERSION is empty; --version has nothing to report.")
 
 # The character check (letters, digits, '.', '_', '-') lives in
 # scripts/tma_conf.sh, where it can name the offending value; GN has no string
@@ -50,6 +52,7 @@ config("tma_identity") {
     "TMA_STARTUP_URL=\"$tma_startup_url\"",
     "TMA_MIN_WIDTH=$tma_min_width",
     "TMA_MIN_HEIGHT=$tma_min_height",
+    "TMA_CHROMIUM_VERSION=\"$tma_chromium_version\"",
   ]
 }
 
@@ -144,6 +147,11 @@ executable("tma") {
     "//content/shell:pak",
     "//tools/v8_context_snapshot",
   ]
+
+  # tma_main.cc reads TMA_APP_NAME and TMA_CHROMIUM_VERSION for --version;
+  # tma_shell already carries this, the executable needs it in its own right.
+  configs += [ ":tma_identity" ]
+
   if (!is_component_build) {
     configs += [ "//build/config/gcc:rpath_for_built_shared_libraries" ]
   }
