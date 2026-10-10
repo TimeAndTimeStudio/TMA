@@ -19,43 +19,61 @@ namespace tma {
 
 namespace {
 
-// Chromium keeps its Vulkan graphics backend behind base::Feature "Vulkan",
-// which is disabled by default on every platform except Android
-// (gpu/config/gpu_finch_features.cc). On Linux that gate decides far more than
-// compositing:
+// Chromium reaches its Vulkan stack through three switches, and TMA takes
+// none of them from a human -- main() refuses every argument -- so TMA adds
+// all three here. Which graphics stack the shell runs on is a property of the
+// build rather than of whoever types at the binary, which is the same bargain
+// tma.conf already makes for the startup URL.
 //
-//   * gpu/command_buffer/service/service_utils.cc derives both
-//     GpuPreferences::use_vulkan and the Skia GrContext type from it, so with
-//     the feature off Skia runs on GL;
-//   * gpu/command_buffer/service/webgpu_decoder_impl.cc only offers WebGPU a
-//     real backend when that Skia context is Vulkan-backed. On Linux it
-//     otherwise hands out the Null backend -- see the "Deliberately disable
-//     compat on linux" branch -- and requestAdapter() answers null, which the
-//     page sees as "No available adapters."
+// Wayland-only needs no switch at all: X11 is not compiled in (see the GN
+// args), so there is no second platform for the shell to drift onto.
 //
-// So this one feature is the whole difference between WebGPU existing and not,
-// and no compile-time argument reaches it: features are parsed from the
-// command line. TMA takes no switch from a human (main() refuses every one),
-// so TMA appends this switch itself. The graphics stack a shell runs on is
-// therefore decided by the build, not by whoever types at the binary.
-//
-// Merged into an existing --enable-features rather than set, because a helper
-// launched by Chromium may already carry a list of its own and overwriting the
-// map entry would silently drop it.
-void EnableVulkanGraphics(base::CommandLine* command_line) {
+// 2 below is the "only" in Wayland + Vulkan only -- native Vulkan is requested
+// as a switch value the GPU blocklist may not rescind, rather than as a
+// feature default it can.
+void RequireVulkanGraphics(base::CommandLine* command_line) {
+  // 1. features::kVulkan. Disabled by default on every platform but Android
+  //    (gpu/config/gpu_finch_features.cc), which is why Vulkan was never
+  //    reached before: service_utils.cc derives both GpuPreferences::use_vulkan
+  //    and the Skia GrContext type from this one feature, and
+  //    webgpu_decoder_impl.cc only offers WebGPU a real backend when that
+  //    context is Vulkan-backed. On Linux it hands out the Null backend
+  //    otherwise -- the "Deliberately disable compat on linux" branch -- and
+  //    requestAdapter() answers null.
+  //
+  //    Merged into any list already present rather than set: a helper launched
+  //    by Chromium may carry --enable-features of its own, and the switch is a
+  //    map entry, so overwriting would silently drop theirs.
   constexpr std::string_view kVulkan = "Vulkan";
   const std::string existing =
       command_line->GetSwitchValueASCII(switches::kEnableFeatures);
+  bool already = false;
   for (const std::string& feature :
        base::SplitString(existing, ",", base::TRIM_WHITESPACE,
                          base::SPLIT_WANT_NONEMPTY)) {
     if (feature == kVulkan) {
-      return;
+      already = true;
+      break;
     }
   }
-  command_line->AppendSwitchASCII(
-      switches::kEnableFeatures,
-      existing.empty() ? std::string(kVulkan) : existing + ",Vulkan");
+  if (!already) {
+    command_line->AppendSwitchASCII(
+        switches::kEnableFeatures,
+        existing.empty() ? std::string(kVulkan) : existing + ",Vulkan");
+  }
+
+  // 2. --use-vulkan=native, which service_utils.cc maps to
+  //    VulkanImplementationName::kForcedNative: Vulkan the GPU blocklist is
+  //    not permitted to override.
+  command_line->AppendSwitchASCII("use-vulkan", "native");
+
+  // 3. --use-angle=vulkan, the same stack for WebGL. gl/init/
+  //    gl_display_initializer.cc reads it to pick ANGLE's backend, and
+  //    gl_factory.cc infers --use-gl=angle when --use-angle is present, so
+  //    that switch is not needed. Left alone, ANGLE still reports OpenGL ES
+  //    but translates to Mesa's desktop GL, and the shell would run WebGL and
+  //    WebGPU on two different APIs while claiming one of them.
+  command_line->AppendSwitchASCII("use-angle", "vulkan");
 }
 
 }  // namespace
@@ -80,7 +98,7 @@ std::optional<int> TmaMainDelegate::BasicStartupComplete() {
   // the switch is added late enough to see everything Chromium set and early
   // enough that nothing has read the feature yet.
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-  EnableVulkanGraphics(command_line);
+  RequireVulkanGraphics(command_line);
   VLOG(1) << "TMA starting with command line: "
           << command_line->GetCommandLineString();
 
