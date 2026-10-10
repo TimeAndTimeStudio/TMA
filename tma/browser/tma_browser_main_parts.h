@@ -8,7 +8,6 @@
 #include <memory>
 
 #include "content/shell/browser/shell_browser_main_parts.h"
-#include "ui/gfx/geometry/size.h"
 
 class GURL;
 
@@ -36,16 +35,10 @@ class TmaBrowserMainParts : public content::ShellBrowserMainParts {
   CreateShellPlatformDelegate() override;
 
  private:
-  // URL to open in the first window. Resolution order:
-  //   1. first non-switch command line argument (URL or file path)
-  //   2. startup from tma.conf when it is a URL (startup = url:...)
-  //   3. file://<exe dir>/<app_name>_resources/index.html, which is what
-  //      startup = file means
-  //   4. an inline data: URL describing the missing resource
+  // startup from tma.conf, compiled in. There is no command-line argument and
+  // no switch that can change it; a value that is not a usable URL opens an
+  // inline data: URL saying so instead. See tma.conf.
   GURL GetStartupURL() const;
-
-  // Initial window size from --window-size=<width>x<height>, else the default.
-  gfx::Size GetWindowSize() const;
 };
 
 }  // namespace tma

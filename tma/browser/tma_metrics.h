@@ -35,11 +35,9 @@ inline constexpr int kResizeAreaCornerSize = 16;
 // the top-right corner stay available to kResizeHitThickness.
 inline constexpr int kCaptionButtonWidth = 34;
 
-// Smallest allowed client (web content) area.
-inline constexpr int kMinWindowWidth = 320;
-inline constexpr int kMinWindowHeight = 200;
-
-// Default window size, overridable with --window-size=<width>x<height>.
+// Default window size. The floor is not here: min_width / min_height live in
+// tma.conf and reach TmaView::GetMinimumSize() as TMA_MIN_WIDTH /
+// TMA_MIN_HEIGHT, because that is where the rest of the shape is written down.
 inline constexpr int kDefaultWindowWidth = 1280;
 inline constexpr int kDefaultWindowHeight = 800;
 

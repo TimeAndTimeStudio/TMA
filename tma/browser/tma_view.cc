@@ -10,7 +10,6 @@
 #include "content/public/browser/web_contents.h"
 #include "content/shell/browser/shell.h"
 #include "tma/browser/tma_fullscreen.h"
-#include "tma/browser/tma_metrics.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/events/event_constants.h"
@@ -75,7 +74,10 @@ bool TmaView::AcceleratorPressed(const ui::Accelerator& accelerator) {
 }
 
 gfx::Size TmaView::GetMinimumSize() const {
-  return gfx::Size(kMinWindowWidth, kMinWindowHeight);
+  // min_width / min_height from tma.conf, baked in by //tma/BUILD.gn. This is
+  // the client (web content) area: TmaFrameView::GetMinimumSize() adds the
+  // strip TMA draws along the top on top of it before the window sees it.
+  return gfx::Size(TMA_MIN_WIDTH, TMA_MIN_HEIGHT);
 }
 
 BEGIN_METADATA(TmaView)

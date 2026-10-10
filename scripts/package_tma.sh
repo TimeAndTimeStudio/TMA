@@ -42,7 +42,6 @@ TMA_OUT="${TMA_OUT:-$CHROMIUM_SRC/out/Default}"
 # file again here rather than hardcoding "tma" is what keeps a rename from
 # leaving a package full of files under the old name.
 APP="$(tma_conf_name)"
-RES_DIR="${APP}_resources"
 
 do_xz=0
 if [[ "${1:-}" == "--xz" ]]; then
@@ -54,15 +53,9 @@ DIST="${1:-$PROJECT_ROOT/build}"
 
 EXE="$TMA_OUT/$APP"
 PAK="$TMA_OUT/content_shell.pak"
-RES="$TMA_OUT/$RES_DIR"
 
 [[ -x "$EXE" ]] || die "$EXE not found; run scripts/build_tma.sh first"
 [[ -f "$PAK" ]] || die "$PAK not found; run scripts/build_tma.sh first"
-# Usually required, but not when tma.conf opens a URL: the copy target is left
-# out of the build graph then, so the directory should not exist at all.
-if [[ "$(tma_conf_get startup)" != url:* && ! -d "$RES" ]]; then
-  die "$RES not found; run scripts/build_tma.sh first"
-fi
 
 bytes() { # bytes <file> -> "12345678 B (117.7 MB)"
   local n
@@ -71,7 +64,10 @@ bytes() { # bytes <file> -> "12345678 B (117.7 MB)"
 }
 
 mkdir -p "$DIST"
-rm -rf "${DIST:?}/$RES_DIR"
+# Older builds staged <app_name>_resources/ and an empty locales/ here. There
+# is no packaged page any more and nothing ever produced a .pak under locales,
+# so clear both rather than ship dead weight.
+rm -rf "${DIST:?}/${APP}_resources" "${DIST:?}/locales"
 # Older builds staged a locales/ directory here. Nothing produces one any more
 # (out/Default/locales is empty and no build rule writes to it), so clear any
 # copy left behind rather than ship an empty folder.
@@ -80,11 +76,6 @@ rm -rf "${DIST:?}/locales"
 log "staging -> $DIST"
 cp -f "$EXE"   "$DIST/$APP"
 cp -f "$PAK"   "$DIST/content_shell.pak"
-if [[ -d "$RES" ]]; then
-  # Absent when tma.conf opens a URL -- see the check above. The rm -rf
-  # already handled a case where an earlier build did produce one.
-  cp -a "$RES" "$DIST/$RES_DIR"
-fi
 
 # Runtime files that must sit next to the binary. Chromium resolves them
 # relative to /proc/self/exe, so a staged copy without them dies at startup
@@ -148,11 +139,6 @@ fi
 
 log ""
 log "  content_shell.pak $(bytes "$DIST/content_shell.pak")"
-if [[ -d "$DIST/$RES_DIR" ]]; then
-  log "  $RES_DIR     $(du -sh --apparent-size "$DIST/$RES_DIR" | cut -f1)"
-else
-  log "  $RES_DIR     not packaged (startup is a URL)"
-fi
 log ""
 log "total: $(du -sh --apparent-size "$DIST" | cut -f1) in $DIST"
 if [[ -x "$DIST/$APP" ]]; then

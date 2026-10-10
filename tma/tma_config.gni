@@ -2,7 +2,7 @@
 # Date: 2026-10-09 08:50 +0700
 # License: GPL-3.0-or-later
 
-# Application identity for TMA.
+# Application identity, startup URL and window floor for TMA.
 #
 # The values themselves live in //tma.conf, which scripts/setup_chromium.sh
 # reads and appends to GN_ARGS -- so these declare_args() defaults are only a
@@ -11,15 +11,16 @@
 # survive if someone edits one file and not the other.
 #
 # Everything here is compile-time on purpose. The output binary is named
-# <tma_app_name> and its resource directory is <tma_app_name>_resources, and a
-# process cannot rename its own file by reading a config, so the name has to be
-# decided before the link. The window title and Wayland app_id follow the same
-# values to keep identity consistent across all four places.
+# <tma_app_name>, and a process cannot rename its own file by reading a
+# config, so the name has to be decided before the link. The startup URL and
+# the window floor follow the same reasoning: TMA takes no command-line
+# argument at all, so what the window opens and how small it may get are
+# properties of the binary rather than of how it happened to be invoked.
 #
 # See //tma/BUILD.gn for where each one lands.
 
 declare_args() {
-  # Output binary name and resource directory prefix. No path separators.
+  # Output binary name. No path separators.
   tma_app_name = "tma"
 
   # Wayland xdg_toplevel app_id. Compositors match this against the
@@ -27,10 +28,14 @@ declare_args() {
   # once this is shipped as something other than "tma".
   tma_app_id = "tma"
 
-  # A URL to open instead of the packaged page; empty when tma.conf says
-  # `startup = file`. setup_chromium.sh owns the format of that single key --
-  # "url:<url>" or the bare word "file" -- and splits it here, so this file
-  # never has to interpret a prefix. The "file" case carries no value at all:
-  # <tma_app_name>_resources/index.html is not something the config may change.
-  tma_startup_url = ""
+  # The one URL the window opens. setup_chromium.sh owns the format of the
+  # `startup` key in tma.conf and strips its "url:" prefix, so this file never
+  # has to interpret a string. Empty only if someone hand-edits args.gn:
+  # setup rejects a config that does not state a URL.
+  tma_startup_url = "https://example.com"
+
+  # Smallest the window may be, in pixels -- the client (web content) area.
+  # The strip TMA draws along the top adds to the height on top of this.
+  tma_min_width = 320
+  tma_min_height = 200
 }

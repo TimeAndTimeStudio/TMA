@@ -33,49 +33,39 @@ The first run is heavy. After that every step is idempotent.
 
 ## Configure
 
-`./tma.conf` decides the application's identity and what it opens with:
+`./tma.conf` decides the application's identity, what the window opens with,
+and the floor it cannot shrink past:
 
 ```ini
 app_name = tma
 app_id = tma
-startup = file
+startup = url:https://example.com
+min_width = 320
+min_height = 200
 ```
 
 `app_name` and `app_id` must start with a letter or digit and use only
-letters, digits, `.` `_` and `-`.
+letters, digits, `.` `_` and `-`. `min_width` / `min_height` must be positive
+integers: they are the client (web content) area, and the strip along the top
+adds to the height on top of `min_height`.
 
-`startup` is required and says what the window opens with when the command line
-says nothing. There are exactly two values:
+`startup` is required and has exactly one form, `url:<url>` — anything with a
+scheme (`http://`, `https://`, `data:`, ...). There is no packaged page: this
+URL is the only thing the window will ever open. An empty value, a `file`
+keyword left over from an older config, or a URL with no scheme are each
+rejected by `./build.sh` in under a second.
 
-```ini
-startup = file                      the packaged page:
-                                     <app_name>_resources/index.html
-startup = url:https://example.com   a URL
-```
-
-`file` takes **no name** on purpose: the entry point is fixed at `index.html`
-and the config only chooses between that page and a URL. Everything else in
-`tma/resources/` is copied beside it, so drop assets next to `index.html`, run
-`./build.sh`, and they appear in `<app_name>_resources/`. Subdirectories are not
-preserved — keep assets at the top level. An empty `startup` is an error, and
-`./build.sh` reports it in under a second.
-
-With `startup = url:...` nothing would ever read that directory, so it is left
-out of the build entirely: no `<app_name>_resources/` is produced, and an
-earlier one is deleted on the next build.
+**TMA takes no arguments at all.** No `--url`, no positional argument, no
+`--window-size`, no `--fullscreen` — each was removed so that what a binary
+does follows from `tma.conf` alone and nothing about how it was invoked. What
+the window opens and how small it may get are decided before the link.
 
 There is deliberately no window title. The top bar carries the three caption
 buttons and no text, so a page's `<title>` has nowhere to appear and is
 ignored.
 
 The file is read at *setup* time and baked into the binary, so re-run
-`./build.sh` after editing it. A command-line argument always beats the
-configured value:
-
-```bash
-build/<app_name> https://example.com
-build/<app_name> /path/to/page.html
-```
+`./build.sh` after editing it.
 
 ## Where the output goes
 
@@ -83,7 +73,6 @@ build/<app_name> /path/to/page.html
 |---|---|
 | `build/<app_name>` | the binary, stripped |
 | `build/content_shell.pak` | resources |
-| `build/<app_name>_resources/` | the app page and its assets |
 
 `$HOME/chromium/src/out/Default` keeps the unstripped build (273 MB). `build/`
 is the shippable copy (146 MB) — copy the whole directory.
@@ -135,19 +124,17 @@ Nothing. The build is local, packaging is `cp` / `strip` / `xz`.
 Nothing either. The only IPC is the Wayland socket and, over D-Bus,
 `org.freedesktop.appearance` (prefers-color-scheme) and
 `org.freedesktop.portal.FileChooser` (the file dialog) — both local, neither a
-URL. The packaged page ships no external resources and only calls `fetch()` when
-you submit a URL in its box.
+URL.
 
-Two things do reach the network, and both are yours:
+One thing reaches the network, and it is yours — the URL this opens once, at
+startup:
 
 ```ini
-# opens that URL once, at startup
 startup = url:https://example.com
 ```
 
-```bash
-build/<app_name> https://example.com   # a URL or a path, with no flag
-```
+The page it opens makes whatever requests it likes, which is its business and
+not TMA's; TMA itself issues none.
 
 `git push` to `github.com/TimeAndTimeStudio/TMA` is run by hand; nothing in
 `./build.sh` talks to GitHub.
@@ -157,10 +144,9 @@ build/<app_name> https://example.com   # a URL or a path, with no flag
 ```
 CHROMIUM_VERSION    the Chromium tag TMA builds against
 build.sh            the whole workflow
-tma.conf            application name, id and startup target
+tma.conf            application name, id, startup URL and window floor
 tma/browser/        the frame: hit-test, caption buttons, strip
 tma/app/            process entry point
-tma/resources/      the application page and its assets
 scripts/            deps, setup, build, run, package
 ```
 

@@ -26,6 +26,9 @@ assert(is_linux, "TMA only supports Linux.")
 assert(toolkit_views, "TMA requires the views toolkit (USE_AURA on Linux).")
 assert(ozone_platform_wayland, "TMA requires the Ozone Wayland platform.")
 assert(tma_app_name != "", "app_name in tma.conf is empty.")
+assert(tma_startup_url != "", "startup in tma.conf must be 'url:<url>'.")
+assert(tma_min_width > 0 && tma_min_height > 0,
+       "min_width / min_height in tma.conf must be positive integers.")
 
 # The character check (letters, digits, '.', '_', '-') lives in
 # scripts/tma_conf.sh, where it can name the offending value; GN has no string
@@ -45,6 +48,8 @@ config("tma_identity") {
     "TMA_APP_NAME=\"$tma_app_name\"",
     "TMA_APP_ID=\"$tma_app_id\"",
     "TMA_STARTUP_URL=\"$tma_startup_url\"",
+    "TMA_MIN_WIDTH=$tma_min_width",
+    "TMA_MIN_HEIGHT=$tma_min_height",
   ]
 }
 
@@ -116,42 +121,6 @@ source_set("tma_shell") {
   }
 }
 
-# Copies the application page and every asset beside it next to the built
-# executable, so the shell can load them with file:// URLs and no backend.
-# Dropping a file into tma/resources/ is enough -- there is no list to edit.
-#
-# expand_directory() is allowlisted in the checkout's .gn (scripts/
-# setup_chromium.sh adds this file), because GN otherwise refuses a directory
-# as a source. That allowlist is what stops a stray directory from pulling
-# thousands of files into the build. The listing happens at gn gen time, so a
-# new asset is picked up by the next ./build.sh.
-#
-# The directory is flattened: {{source_file_part}} drops the path, so keep
-# assets at the top level of tma/resources/. Two files with the same name in
-# different subdirectories would produce two rules for one output and fail at
-# ninja time rather than silently overwriting each other.
-#
-# The target name stays "tma_resources" so existing data_deps references and
-# `autoninja ... tma_resources` keep working; only the directory on disk is
-# named from tma.conf, and TmaBrowserMainParts builds the same name from
-# TMA_APP_NAME at startup.
-#
-# It is only part of the build when tma.conf actually opens it. With
-# `startup = url:...` nothing would ever read the directory, so the target is
-# left out of the graph instead of copied and then ignored: a URL-configured
-# build has no <app_name>_resources on disk at all. scripts/build_tma.sh drops
-# a directory left behind by an earlier `startup = file`, because ninja only
-# ever adds outputs and never removes them.
-if (tma_startup_url == "") {
-  copy("tma_resources") {
-    testonly = true
-
-    sources = expand_directory("resources", true)
-
-    outputs = [ "$root_out_dir/${tma_app_name}_resources/{{source_file_part}}" ]
-  }
-}
-
 executable("tma") {
   testonly = true
 
@@ -175,11 +144,6 @@ executable("tma") {
     "//content/shell:pak",
     "//tools/v8_context_snapshot",
   ]
-  if (tma_startup_url == "") {
-    # Only declared when the copy target above exists; see the comment there.
-    data_deps += [ ":tma_resources" ]
-  }
-
   if (!is_component_build) {
     configs += [ "//build/config/gcc:rpath_for_built_shared_libraries" ]
   }

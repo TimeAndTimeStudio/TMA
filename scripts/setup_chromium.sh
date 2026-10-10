@@ -44,10 +44,10 @@ DEPOT_TOOLS="${DEPOT_TOOLS:-$HOME/depot_tools}"
 TMA_OUT="${TMA_OUT:-$CHROMIUM_SRC/out/Default}"
 
 # --- application identity from tma.conf --------------------------------------
-# tma.conf is the one place app_name / app_id / startup target are written
-# down. It is read and checked before any download, copy or patch, so that a
-# bad config fails in under a second instead of after a gclient sync; the
-# values become GN arguments further down, next to gn gen. //tma/BUILD.gn
+# tma.conf is the one place app_name / app_id / startup / window floor are
+# written down. It is read and checked before any download, copy or patch, so
+# that a bad config fails in under a second instead of after a gclient sync;
+# the values become GN arguments further down, next to gn gen. //tma/BUILD.gn
 # cannot read the file itself because the checkout is a copy of this repo made
 # at setup time, so a config-only edit has to reach that gn gen invocation to
 # have any effect at all.
@@ -56,6 +56,8 @@ source "$SCRIPT_DIR/tma_conf.sh"
 _tma_app_name="$(tma_conf_get app_name)" || _tma_app_name=""
 _tma_app_id="$(tma_conf_get app_id)" || _tma_app_id=""
 _tma_startup="$(tma_conf_get startup)" || _tma_startup=""
+_tma_min_width="$(tma_conf_get min_width)" || _tma_min_width=""
+_tma_min_height="$(tma_conf_get min_height)" || _tma_min_height=""
 
 # A missing value falls back to the stock identity, but a present value that is
 # not usable dies here. app_name becomes an output path and is also spliced
@@ -72,28 +74,48 @@ if ! tma_conf_valid_name "$_tma_app_id"; then
   die "tma.conf: app_id '$_tma_app_id' must start with a letter or digit and use only letters, digits, '.', '_' and '-'"
 fi
 
+# min_width / min_height become the compile-time floor TmaView::GetMinimumSize()
+# returns, so a value that is not a positive integer would reach the window as
+# zero and look like a bug rather than a typo. Checked here for the same reason
+# startup is: in a second, not after a build. `[1-9][0-9]*` rejects leading
+# zeros as well, so there is no octal surprise to guard against later.
+if [[ -z "$_tma_min_width" ]]; then
+  _tma_min_width="320"
+elif ! [[ "$_tma_min_width" =~ ^[1-9][0-9]*$ ]]; then
+  die "tma.conf: min_width '$_tma_min_width' must be a positive integer"
+fi
+if [[ -z "$_tma_min_height" ]]; then
+  _tma_min_height="200"
+elif ! [[ "$_tma_min_height" =~ ^[1-9][0-9]*$ ]]; then
+  die "tma.conf: min_height '$_tma_min_height' must be a positive integer"
+fi
+
 # startup is the one key whose format this script owns, so it is checked here:
 # catching a typo costs a second, catching it later costs a build plus a window
-# that opens the wrong thing, or nothing at all.
-#
-# "file" takes no name on purpose. The packaged page is
-# <app_name>_resources/index.html and the config does not get to choose which
-# file that is -- only whether to open it or a URL instead. The split into GN
-# arguments happens here too rather than in //tma/browser, so the C++ side
-# never interprets a prefix (which also keeps clang from constant-folding the
-# branch and failing the build on -Wunreachable-code).
+# that opens the wrong thing, or nothing at all. The prefix is stripped here as
+# well rather than in //tma/browser, so the C++ side never interprets a string
+# (which also keeps clang from constant-folding a branch and failing the build
+# on -Wunreachable-code): setup hands the URL over on its own.
 _tma_startup_url=""
 case "$_tma_startup" in
-  "")      die "tma.conf: startup is required -- set 'file' or 'url:<url>'" ;;
-  file)    ;;  # the packaged page; there is nothing to pass on
-  file:*)  die "tma.conf: startup 'file' takes no name; the packaged page is ${_tma_app_name}_resources/index.html" ;;
+  "")      die "tma.conf: startup is required -- set 'url:<url>'" ;;
   url:?*)  _tma_startup_url="${_tma_startup#url:}" ;;
   url:)    die "tma.conf: startup 'url:' has no URL after it" ;;
-  *)       die "tma.conf: startup must be 'file' or 'url:<url>' -- got '$_tma_startup'" ;;
+  file)    die "tma.conf: startup 'file' is gone -- TMA has no packaged page; set 'url:<url>'" ;;
+  *)       die "tma.conf: startup must be 'url:<url>' -- got '$_tma_startup'" ;;
 esac
 
+# The prefix is only half of a URL. TmaBrowserMainParts asks GURL whether the
+# value is usable, and one with no scheme fails there and opens the "bad
+# startup" page instead of the site. Catching it here turns a runtime surprise
+# into a message that names the key.
+if ! [[ "$_tma_startup_url" =~ ^[A-Za-z][A-Za-z0-9+.-]*: ]]; then
+  die "tma.conf: startup URL '$_tma_startup_url' has no scheme -- write url:<scheme>://..."
+fi
+
 log "identity: app_name=$_tma_app_name app_id=$_tma_app_id"
-log "startup:  $_tma_startup"
+log "startup:   $_tma_startup"
+log "min size:  ${_tma_min_width}x${_tma_min_height}"
 
 # --- depot_tools ------------------------------------------------------------
 if [[ ! -d "$DEPOT_TOOLS" ]]; then
@@ -208,39 +230,27 @@ group("tma_hook") {
 EOF
 fi
 
-# --- let //tma/BUILD.gn enumerate tma/resources ------------------------------
-# expand_directory() is allowlisted per build file so that a stray directory
-# cannot silently pull thousands of files into the build. //tma/BUILD.gn uses
-# it to copy tma/resources/ -- every asset, not just index.html -- without
-# keeping a second, hand-maintained copy of the file list next to it. Like the
-# root hook above, git checkout --force during pinning drops this patch, so it
-# is re-applied on every run.
+# --- drop the expand_directory allowlist a previous setup added ---------------
+# //tma/BUILD.gn used to enumerate tma/resources/ with expand_directory(), and
+# GN allowlists that per build file so a stray directory cannot pull thousands
+# of files into the build. There is no tma/resources/ any more, so the entry is
+# removed rather than left behind -- the marker line is what this looks for,
+# which keeps it idempotent.
 GN_DOTFILE="$CHROMIUM_SRC/.gn"
 EXPAND_MARK="# --- TMA lists tma/resources (added by scripts/setup_chromium.sh) ---"
 if grep -qF "$EXPAND_MARK" "$GN_DOTFILE"; then
-  log "//.gn already allowlists //tma/BUILD.gn for expand_directory()"
-else
-  log "Allowlisting //tma/BUILD.gn for expand_directory() in //.gn"
-  python3 - "$GN_DOTFILE" "$EXPAND_MARK" <<'PY'
+  log "Dropping the stale expand_directory allowlist entry in //.gn"
+  python3 - "$GN_DOTFILE" "$EXPAND_MARK" <<'PYPATCH'
 import sys
 
 path, mark = sys.argv[1], sys.argv[2]
-text = open(path, encoding="utf-8").read()
-
-anchor = '      "//components/policy/BUILD.gn",'
-if text.count(anchor) != 1:
-    sys.exit("setup: expand_directory anchor count is %d in %s"
-             % (text.count(anchor), path))
-
-block = (
-    anchor + "\n"
-    "      " + mark + "\n"
-    '      "//tma/BUILD.gn",\n'
-)
-text = text.replace(anchor, block, 1)
-
-open(path, "w", encoding="utf-8").write(text)
-PY
+kept = []
+for line in open(path, encoding="utf-8"):
+    if mark in line or line.strip() == '"//tma/BUILD.gn",':
+        continue
+    kept.append(line)
+open(path, "w", encoding="utf-8").write("".join(kept))
+PYPATCH
 fi
 
 # --- trim the resource pack that ships ---------------------------------------
@@ -603,7 +613,8 @@ EOF
 GN_ARGS="$GN_ARGS
 tma_app_name = \"$(tma_conf_gn_escape "$_tma_app_name")\"
 tma_app_id = \"$(tma_conf_gn_escape "$_tma_app_id")\"
-tma_startup_url = \"$(tma_conf_gn_escape "$_tma_startup_url")\"
+tma_startup_url = \"$(tma_conf_gn_escape "$_tma_startup_url")\"tma_min_width = $_tma_min_width
+tma_min_height = $_tma_min_height
 "
 
 log "gn gen $TMA_OUT"

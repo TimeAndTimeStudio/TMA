@@ -6,7 +6,11 @@
 # Runs the TMA display shell on a Wayland session.
 #
 # Usage:
-#   scripts/run_tma.sh [-- <extra tma args...>]
+#   scripts/run_tma.sh
+#
+# TMA takes no arguments at all. What it opens, its name, its Wayland app_id
+# and its window floor are all decided by tma.conf at build time -- see that
+# file -- which is what makes two runs of the same binary do the same thing.
 #
 # Environment:
 #   CHROMIUM_SRC  Chromium src/ directory. Default: $HOME/chromium/src
@@ -34,29 +38,10 @@ if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
   die "WAYLAND_DISPLAY is not set. TMA only supports Wayland; start it from a Wayland session (e.g. GNOME on Wayland, KDE Plasma Wayland, sway, Hyprland)."
 fi
 
-args=()
-
-# Chromium aborts (LOG(FATAL)) only when the setuid helper exists but is not
-# root-owned, setuid and world-executable — sandbox/linux/suid/client/
-# setuid_sandbox_host.cc:170-176. When the helper is absent entirely it uses
-# the user-namespace sandbox instead, which Fedora allows by default, so no
-# flag is needed at all. Force --no-sandbox for the one case Chromium itself
-# would refuse to start.
-args=()
-for helper in "$TMA_OUT/chrome-sandbox"; do
-  if [[ -f "$helper" ]]; then
-    mode="$(stat -c '%a' "$helper" 2>/dev/null || echo 0)"
-    owner="$(stat -c '%u' "$helper" 2>/dev/null || echo 1)"
-    if [[ "$owner" != "0" ]] || (( (8#$mode & 4000) == 0 )) || (( (8#$mode & 1) == 0 )); then
-      log "note: $helper is mode $mode owner $owner; using --no-sandbox."
-      log "      To use the sandbox: sudo chown root:root $helper && sudo chmod 4755 $helper"
-      args+=(--no-sandbox)
-    fi
-  fi
-done
-
-if [[ "${1:-}" == "--" ]]; then
-  shift
-fi
-
-exec "$EXE" "${args[@]}" "$@"
+# Chromium aborts (LOG(FATAL)) only when the setuid sandbox helper exists but
+# is not root-owned, setuid and world-executable -- sandbox/linux/suid/client/
+# setuid_sandbox_host.cc:170-176. The build never produces chrome-sandbox, so
+# the helper is absent entirely and Chromium falls back to the user-namespace
+# sandbox, which Fedora allows by default. Nothing to pass, and nothing TMA
+# would accept if there were.
+exec "$EXE"

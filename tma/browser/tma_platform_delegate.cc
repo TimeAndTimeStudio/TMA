@@ -7,7 +7,6 @@
 #include <utility>
 
 #include "base/check.h"
-#include "base/command_line.h"
 #include "content/public/browser/file_select_listener.h"
 #include "content/public/browser/web_contents.h"
 #include "content/shell/browser/shell.h"
@@ -37,8 +36,6 @@ struct TmaPlatformDelegate::TmaPlatformData {
 };
 
 namespace {
-
-constexpr char kFullscreenSwitch[] = "fullscreen";
 
 TmaView* TmaViewForWidget(views::Widget* widget) {
   return static_cast<TmaView*>(widget->widget_delegate()->GetContentsView());
@@ -130,14 +127,6 @@ void TmaPlatformDelegate::SetContents(content::Shell* shell) {
 
   shell_data.fullscreen_observer =
       std::make_unique<TmaFullscreenObserver>(shell->web_contents(), widget);
-
-  // views::Widget::Init() only honours kMaximized and kMinimized out of
-  // params.show_state (ui/views/widget/widget.cc); kFullscreen is dropped on
-  // the floor there, so the switch has to be requested explicitly once the
-  // native window exists.
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kFullscreenSwitch)) {
-    SetNativeFullscreen(widget, true);
-  }
 }
 
 void TmaPlatformDelegate::ResizeWebContent(content::Shell* shell,

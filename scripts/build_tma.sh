@@ -31,9 +31,7 @@ DEPOT_TOOLS="${DEPOT_TOOLS:-$HOME/depot_tools}"
 
 # tma.conf is baked into args.gn by setup_chromium.sh, so an edit to the file
 # only takes effect on the next setup. Catching the difference here is cheaper
-# than compiling a binary under the wrong name and finding it missing later,
-# and easier to explain than a build that drops <app_name>_resources or leaves
-# one behind for the wrong startup.
+# than compiling a binary that opens the wrong URL and finding out at runtime.
 conf_app="$(tma_conf_name)"
 conf_startup="$(tma_conf_get startup)" || conf_startup=""
 built_app="$(sed -nE 's/^tma_app_name = "(.*)"$/\1/p' "$TMA_OUT/args.gn" 2>/dev/null | tail -n1)"
@@ -42,26 +40,19 @@ if [[ -n "$built_app" && "$built_app" != "$conf_app" ]]; then
 fi
 if grep -q '^tma_startup_url = ' "$TMA_OUT/args.gn" 2>/dev/null; then
   built_url="$(sed -nE 's/^tma_startup_url = "(.*)"$/\1/p' "$TMA_OUT/args.gn" | tail -n1)"
-  if [[ -n "$built_url" ]]; then
-    built_startup="url:$built_url"
-  else
-    built_startup="file"
-  fi
+  built_startup="url:$built_url"
   if [[ "$built_startup" != "$conf_startup" ]]; then
     die "tma.conf startup is '$conf_startup' but this build was configured with '$built_startup'; run scripts/setup_chromium.sh first"
   fi
 fi
 
-# With `startup = url:` the copy target is not in the build graph at all, and
-# ninja only ever adds outputs -- it never removes one produced by an earlier
-# `startup = file`. Drop it here so a URL-configured build really has no
-# <app_name>_resources directory, which is the whole point of not building it.
-if [[ "$conf_startup" == url:* ]]; then
-  stale="$TMA_OUT/${conf_app}_resources"
-  if [[ -d "$stale" ]]; then
-    log "Removing $stale (startup is a URL, so nothing reads it)"
-    rm -rf "$stale"
-  fi
+# ninja only ever adds outputs, so a <app_name>_resources directory left by an
+# older build would sit there forever. There is no packaged page any more, so
+# drop any copy rather than ship one nobody can open.
+stale="$TMA_OUT/${conf_app}_resources"
+if [[ -d "$stale" ]]; then
+  log "Removing $stale (TMA has no packaged page any more)"
+  rm -rf "$stale"
 fi
 
 export PATH="$DEPOT_TOOLS:$PATH"

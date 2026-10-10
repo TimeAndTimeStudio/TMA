@@ -43,13 +43,11 @@ out_dir() { printf '%s' "${TMA_OUT:-${CHROMIUM_SRC:-$HOME/chromium/src}/out/Defa
 stage_dir() { printf '%s' "$SCRIPT_DIR/build"; }
 
 report() {
-  local out pkg app res_dir exe res
+  local out pkg app exe
   out="$(out_dir)"
   pkg="$(stage_dir)"
   app="$(tma_conf_name)"
-  res_dir="${app}_resources"
   exe="$out/$app"
-  res="$out/$res_dir"
 
   printf '\n\033[1mdone\033[0m\n\n'
   if [[ ! -x "$exe" ]]; then
@@ -58,12 +56,6 @@ report() {
   fi
 
   printf '  binary     %s\n' "$exe"
-  if [[ -d "$res" ]]; then
-    printf '  resources  %s\n' "$res"
-    printf '  app page   %s\n' "$res/index.html"
-  else
-    printf '  resources  not built (startup is a URL)\n'
-  fi
   printf '  size       %s\n' "$(du -h --apparent-size "$exe" | cut -f1)"
 
   printf '\n  packaged   %s\n' "$pkg"
