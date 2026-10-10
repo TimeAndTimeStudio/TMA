@@ -61,13 +61,14 @@ _tma_min_width="$(tma_conf_get min_width)" || _tma_min_width=""
 _tma_min_height="$(tma_conf_get min_height)" || _tma_min_height=""
 
 # A missing value falls back to the stock identity, but a present value that is
-# not usable dies here. app_name becomes an output path and is also spliced
-# into the percent-encoded fallback page, so substituting a name silently would
-# resurface much later as a missing file instead of as its cause.
+# not usable dies here. app_name becomes the name of the binary on disk, so
+# substituting a name silently would resurface much later as a missing file
+# instead of as its cause -- and its case matters there, unlike in app_id, so
+# it gets the lowercase pattern rather than tma_conf_valid_name.
 if [[ -z "$_tma_app_name" ]]; then
   _tma_app_name="tma"
-elif ! tma_conf_valid_name "$_tma_app_name"; then
-  die "tma.conf: app_name '$_tma_app_name' must start with a letter or digit and use only letters, digits, '.', '_' and '-'"
+elif ! tma_conf_valid_app_name "$_tma_app_name"; then
+  die "tma.conf: app_name '$_tma_app_name' must be lowercase: start with a letter or digit, then only lowercase letters, digits, '.', '_' and '-'"
 fi
 
 [[ -n "$_tma_app_id" ]] || _tma_app_id="$_tma_app_name"

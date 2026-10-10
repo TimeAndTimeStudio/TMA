@@ -28,11 +28,10 @@ bool LaunchedByChromium(Args args) {
   return false;
 }
 
-// The only two things a human may ask for, and both report the same number
-// because TMA has no version of its own: it is a shell with no code of
-// consequence outside //tma, so what identifies a build is the Chromium it
-// embeds. --version names the product alongside it; --version-browser is the
-// bare value, for anything that means to compare rather than read.
+// The only two things a human may ask for. --version is the shell's own
+// identity: the id a compositor matches the window by, and the release number
+// from tma.conf, and nothing else. --version-browser is the Chromium
+// underneath, bare, for anything that means to compare rather than read.
 //
 // Matched against raw argv rather than base::CommandLine so that this sees
 // exactly what was typed: Chromium appends switches to its own command line as
@@ -43,11 +42,7 @@ bool PrintVersion(Args args) {
   }
   const std::string_view arg(args.front());
   if (arg == "--version") {
-    // Everything that names this build, in the order a bug report wants it:
-    // the shell, its release, the id a compositor matches it by, and the
-    // Chromium underneath.
-    std::printf("%s %s (app_id %s, Chromium %s)\n", TMA_APP_NAME, TMA_VERSION,
-                TMA_APP_ID, TMA_CHROMIUM_VERSION);
+    std::printf("%s %s\n", TMA_APP_ID, TMA_VERSION);
     return true;
   }
   if (arg == "--version-browser") {

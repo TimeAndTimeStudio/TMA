@@ -49,12 +49,22 @@ tma_conf_name() {
 
 # tma_conf_valid_name <value>
 #
-# True when <value> is safe to use as a file name, as a GN string, and spliced
-# into the percent-encoded fallback page: ASCII, starts with a letter or digit,
-# then only letters, digits, '.', '_' and '-'. Also a legal reverse-DNS id, so
-# app_id is checked with the same pattern.
+# True when <value> is safe to use as a GN string and spliced into a
+# percent-encoded URL: ASCII, starts with a letter or digit, then only
+# letters, digits, '.', '_' and '-'. Upper case is allowed -- app_id is
+# checked with this, and a reverse-DNS id may legitimately carry it.
 tma_conf_valid_name() {
   [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
+}
+
+# tma_conf_valid_app_name <value>
+#
+# app_name, and stricter than the pattern above: lowercase only. It becomes the
+# name of the binary on disk, where `Tma` and `tma` are two different files on
+# this filesystem and one indistinguishable pair on others -- a name whose case
+# matters is a name scripts mistype and users copy wrong.
+tma_conf_valid_app_name() {
+  [[ "$1" =~ ^[a-z0-9][a-z0-9._-]*$ ]]
 }
 
 # tma_conf_gn_escape <value>
