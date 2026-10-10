@@ -19,19 +19,19 @@ namespace tma {
 
 namespace {
 
-// Chromium reaches its Vulkan stack through three switches, and TMA takes
-// none of them from a human -- main() refuses every argument -- so TMA adds
-// all three here. Which graphics stack the shell runs on is a property of the
-// build rather than of whoever types at the binary, which is the same bargain
-// tma.conf already makes for the startup URL.
+// TMA runs Wayland + Vulkan + WebGPU, and nothing else. Chromium reaches all
+// of that through switches, TMA takes none of them from a human -- main()
+// refuses every argument -- so TMA appends them itself. Which stack the shell
+// runs on is therefore a property of the build, the same bargain tma.conf
+// already makes for the startup URL.
 //
-// Wayland-only needs no switch at all: X11 is not compiled in (see the GN
-// args), so there is no second platform for the shell to drift onto.
+// Wayland needs no switch at all: X11 is not compiled in (see the GN args), so
+// there is no second platform for the shell to drift onto.
 //
-// 2 below is the "only" in Wayland + Vulkan only -- native Vulkan is requested
-// as a switch value the GPU blocklist may not rescind, rather than as a
-// feature default it can.
-void RequireVulkanGraphics(base::CommandLine* command_line) {
+// Three switches reach Vulkan, one takes WebGL away. Switch 2 is the "only" in
+// Wayland + Vulkan only -- native Vulkan is requested as a switch value the
+// GPU blocklist may not rescind, rather than as a feature default it can.
+void ConfigureTmaGraphics(base::CommandLine* command_line) {
   // 1. features::kVulkan. Disabled by default on every platform but Android
   //    (gpu/config/gpu_finch_features.cc), which is why Vulkan was never
   //    reached before: service_utils.cc derives both GpuPreferences::use_vulkan
@@ -67,13 +67,28 @@ void RequireVulkanGraphics(base::CommandLine* command_line) {
   //    not permitted to override.
   command_line->AppendSwitchASCII("use-vulkan", "native");
 
-  // 3. --use-angle=vulkan, the same stack for WebGL. gl/init/
-  //    gl_display_initializer.cc reads it to pick ANGLE's backend, and
-  //    gl_factory.cc infers --use-gl=angle when --use-angle is present, so
-  //    that switch is not needed. Left alone, ANGLE still reports OpenGL ES
-  //    but translates to Mesa's desktop GL, and the shell would run WebGL and
-  //    WebGPU on two different APIs while claiming one of them.
+  // 3. --use-angle=vulkan. WebGPU is the only rendering API TMA offers, but
+  //    ANGLE is still linked in and still picks a backend of its own --
+  //    gl/init/gl_display_initializer.cc reads this switch, and gl_factory.cc
+  //    infers --use-gl=angle from its presence, so that one is not needed.
+  //    Left unset, ANGLE defaults to Mesa's desktop GL, which would pull a
+  //    second GPU API into a shell that claims one. Keeping it makes any ANGLE
+  //    context that does get created Vulkan, never desktop GL.
   command_line->AppendSwitchASCII("use-angle", "vulkan");
+
+  // 4. --disable-webgl. content/browser/web_contents/web_contents_impl.cc
+  //    derives prefs.webgl1_enabled and prefs.webgl2_enabled from this single
+  //    switch (along with kDisable3DAPIs, which would also catch WebGL2), so
+  //    one switch retires both versions at once. WebGPU is gated somewhere
+  //    else entirely -- the feature list -- which is why disabling WebGL does
+  //    not touch it.
+  //
+  //    With the pref off Blink never creates the context, so
+  //    canvas.getContext('webgl') answers null instead of handing back a
+  //    wrapper around ANGLE. This is what makes the stack "WebGPU only":
+  //    without it the shell offers two 3D APIs, and the second one reaches
+  //    the GPU by a path the shell never asked for.
+  command_line->AppendSwitch("disable-webgl");
 }
 
 }  // namespace
@@ -98,7 +113,7 @@ std::optional<int> TmaMainDelegate::BasicStartupComplete() {
   // the switch is added late enough to see everything Chromium set and early
   // enough that nothing has read the feature yet.
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-  RequireVulkanGraphics(command_line);
+  ConfigureTmaGraphics(command_line);
   VLOG(1) << "TMA starting with command line: "
           << command_line->GetCommandLineString();
 
