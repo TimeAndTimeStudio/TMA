@@ -43,10 +43,11 @@ void RefuseArguments(Args args) {
   }
   std::fprintf(stderr,
                "error: TMA takes no arguments; refused '%s'.\n"
-               "       What the window opens is startup in tma.conf and how\n"
-               "       small it may get is min_width / min_height. Both are\n"
-               "       baked in at build time: edit tma.conf and re-run\n"
-               "       ./build.sh.\n",
+               "       TMA exits here rather than starting, so no window is\n"
+               "       opened and this argument is never read. startup,\n"
+               "       min_width and min_height in tma.conf are the only\n"
+               "       settings there are, and they are baked in when the\n"
+               "       binary is built: edit tma.conf and re-run ./build.sh.\n",
                joined.c_str());
 }
 
