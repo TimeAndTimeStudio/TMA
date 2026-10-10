@@ -472,6 +472,19 @@ rtc_use_pipewire = false
 # adapter at all.
 skia_use_dawn = true
 
+# SwiftShader as Dawn's fallback WebGPU adapter. Default true on desktop
+# (dawn_features.gni:66), and true here too until now, which made
+# dawn/native/BUILD.gn:1066 define DAWN_ENABLE_SWIFTSHADER and made
+# BackendVk.cpp:196 put ICD::SwiftShader in kICDs *before* the real driver --
+# a software adapter on the CPU, searched first, never selected, because
+# --use-vulkan=native already puts vendor=amd arch=rdna-2 at the front. The
+# only thing it did in a TMA run was dlopen("libvk_swiftshader.so") every time
+# a GPU process started, so dropping that file from the package cost one
+# warning per run. With the define gone kICDs is just {ICD::None}, the
+# fallback is not searched at all, and SwiftShader's Vulkan lib is never
+# built.
+dawn_use_swiftshader = false
+
 # --- remoting -----------------------------------------------------------------
 # Chrome Remote Desktop and its crashpad component.
 enable_remoting = false
