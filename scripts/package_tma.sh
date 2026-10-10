@@ -78,6 +78,26 @@ rm -rf "${DIST:?}/locales"
 # and a package directory is never wiped, so without this they would ride along
 # in every later build as dead weight.
 rm -f "${DIST:?}/libEGL.so" "${DIST:?}/libGLESv2.so"
+# Staged by earlier builds. Each of these was tested by moving it out of this
+# directory and running the package without it:
+#
+#   chrome_crashpad_handler  crash reporting. Ten processes came up, the page
+#                            reported everything it reports with it present.
+#                            Nothing asks for the handler, so nothing needs it.
+#   libvk_swiftshader.so     Dawn's *fallback* WebGPU adapter ICD
+#                            (third_party/dawn/.../BackendVk.cpp:196 searches
+#                            it before the real driver). The primary adapter is
+#                            the hardware one -- vendor=amd arch=rdna-2 -- and
+#                            --use-vulkan=native already rules out software.
+#                            Without the file the only cost is Dawn printing
+#                            "Couldn't load Vulkan: libvk_swiftshader.so" once
+#                            per GPU process, because it never gets to the
+#                            adapter it was never going to use.
+rm -f "${DIST:?}/chrome_crashpad_handler" "${DIST:?}/libvk_swiftshader.so"
+# Written by the app itself at run time: content_shell defaults InitLogging to
+# a file next to the executable. TMA now passes --enable-logging=stderr so it
+# is never created; this clears any copy an older build left here.
+rm -f "${DIST:?}/content_shell.log"
 
 log "staging -> $DIST"
 cp -f "$EXE"   "$DIST/$APP"
@@ -104,11 +124,12 @@ runtime_files=(
   # those link in, and that is all. That also retires the old "the next
   # machine may have neither" reasoning: no host maps them to be without.
   #
-  # SwiftShader and its loader do stay. Chromium dlopen()s both rather than
-  # linking them, so they are absent from `ldd`.
-  libvk_swiftshader.so     # SwiftShader: software (CPU) Vulkan renderer
-  libvulkan.so.1           # the Vulkan loader SwiftShader plugs into
-  chrome_crashpad_handler  # crash reporting; missing is survivable
+  # libvulkan.so.1 stays: VulkanInstance::Initialize dlopen()s it by name
+  # (gpu/vulkan/vulkan_instance.cc:122) and the VulkanImplementationWayland
+  # path resolves exactly "libvulkan.so.1" (vulkan_implementation_wayland.cc:
+  # 42). Without it ANGLE and Dawn both fail to find Vulkan and the GPU process
+  # exits during initialization -- measured, not assumed.
+  libvulkan.so.1           # the Vulkan loader
 )
 staged_runtime=0
 for f in "${runtime_files[@]}"; do

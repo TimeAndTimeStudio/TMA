@@ -13,6 +13,7 @@
 #include "base/logging.h"
 #include "base/strings/string_split.h"
 #include "content/public/browser/content_browser_client.h"
+#include "content/public/common/content_switches.h"
 #include "tma/browser/tma_content_browser_client.h"
 
 namespace tma {
@@ -128,6 +129,14 @@ std::optional<int> TmaMainDelegate::BasicStartupComplete() {
   // enough that nothing has read the feature yet.
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   ConfigureTmaGraphics(command_line);
+
+  // content_shell defaults InitLogging() to LoggingDest::kFile
+  // (content/shell/app/shell_main_delegate.cc:136), so every run wrote
+  // content_shell.log next to the executable -- into the install directory of
+  // a display shell, on every run, and a package directory is never wiped.
+  // "stderr" is the value this switch carries (same file, line 139): the same
+  // messages, with no file left behind.
+  command_line->AppendSwitchASCII(switches::kEnableLogging, "stderr");
   VLOG(1) << "TMA starting with command line: "
           << command_line->GetCommandLineString();
 
