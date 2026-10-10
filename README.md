@@ -38,14 +38,16 @@ and the floor it cannot shrink past:
 
 ```ini
 app_name = tma
+version = 0.1.0
 app_id = tma
 startup = url:https://example.com
 min_width = 320
 min_height = 200
 ```
 
-`app_name` and `app_id` must start with a letter or digit and use only
-letters, digits, `.` `_` and `-`. `min_width` / `min_height` must be positive
+`app_name`, `app_id` and `version` must start with a letter or digit and use
+only letters, digits, `.` `_` `+` and `-`. `version` is TMA's own release
+number; `--version` prints it alongside the Chromium version. `min_width` / `min_height` must be positive
 integers: they are the client (web content) area, and the strip along the top
 adds to the height on top of `min_height`.
 
@@ -93,7 +95,7 @@ Two flags are accepted, and both report the Chromium this build embeds — TMA
 has no version number of its own, it is a shell:
 
 ```bash
-build/<app_name> --version           # tma 155.0.8059.39
+build/<app_name> --version           # tma 0.1.0 (app_id tma, Chromium 155.0.8059.39)
 build/<app_name> --version-browser   # Chromium 155.0.8059.39
 ```
 
@@ -156,6 +158,7 @@ not TMA's; TMA itself issues none.
 
 ```
 CHROMIUM_VERSION    the Chromium tag TMA builds against; --version reports it
+                    together with `version` from tma.conf
 build.sh            the whole workflow
 tma.conf            application name, id, startup URL and window floor
 tma/browser/        the frame: hit-test, caption buttons, strip

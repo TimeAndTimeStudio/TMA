@@ -43,7 +43,11 @@ bool PrintVersion(Args args) {
   }
   const std::string_view arg(args.front());
   if (arg == "--version") {
-    std::printf("%s %s\n", TMA_APP_NAME, TMA_CHROMIUM_VERSION);
+    // Everything that names this build, in the order a bug report wants it:
+    // the shell, its release, the id a compositor matches it by, and the
+    // Chromium underneath.
+    std::printf("%s %s (app_id %s, Chromium %s)\n", TMA_APP_NAME, TMA_VERSION,
+                TMA_APP_ID, TMA_CHROMIUM_VERSION);
     return true;
   }
   if (arg == "--version-browser") {

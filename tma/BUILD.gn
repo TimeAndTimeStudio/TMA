@@ -26,6 +26,7 @@ assert(is_linux, "TMA only supports Linux.")
 assert(toolkit_views, "TMA requires the views toolkit (USE_AURA on Linux).")
 assert(ozone_platform_wayland, "TMA requires the Ozone Wayland platform.")
 assert(tma_app_name != "", "app_name in tma.conf is empty.")
+assert(tma_version != "", "version in tma.conf is empty.")
 assert(tma_startup_url != "", "startup in tma.conf must be 'url:<url>'.")
 assert(tma_min_width > 0 && tma_min_height > 0,
        "min_width / min_height in tma.conf must be positive integers.")
@@ -49,6 +50,7 @@ config("tma_identity") {
   defines = [
     "TMA_APP_NAME=\"$tma_app_name\"",
     "TMA_APP_ID=\"$tma_app_id\"",
+    "TMA_VERSION=\"$tma_version\"",
     "TMA_STARTUP_URL=\"$tma_startup_url\"",
     "TMA_MIN_WIDTH=$tma_min_width",
     "TMA_MIN_HEIGHT=$tma_min_height",

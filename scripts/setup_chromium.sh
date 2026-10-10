@@ -56,6 +56,7 @@ source "$SCRIPT_DIR/tma_conf.sh"
 _tma_app_name="$(tma_conf_get app_name)" || _tma_app_name=""
 _tma_app_id="$(tma_conf_get app_id)" || _tma_app_id=""
 _tma_startup="$(tma_conf_get startup)" || _tma_startup=""
+_tma_version="$(tma_conf_get version)" || _tma_version=""
 _tma_min_width="$(tma_conf_get min_width)" || _tma_min_width=""
 _tma_min_height="$(tma_conf_get min_height)" || _tma_min_height=""
 
@@ -72,6 +73,15 @@ fi
 [[ -n "$_tma_app_id" ]] || _tma_app_id="$_tma_app_name"
 if ! tma_conf_valid_name "$_tma_app_id"; then
   die "tma.conf: app_id '$_tma_app_id' must start with a letter or digit and use only letters, digits, '.', '_' and '-'"
+fi
+
+# version names the shell itself. It is the one key with no sensible default:
+# falling back to a number would make --version claim to be something it is
+# not, so an empty value dies here instead.
+if [[ -z "$_tma_version" ]]; then
+  die "tma.conf: version is required -- it is what --version reports"
+elif ! [[ "$_tma_version" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]]; then
+  die "tma.conf: version '$_tma_version' must start with a letter or digit and use only letters, digits, '.', '_', '+' and '-'"
 fi
 
 # min_width / min_height become the compile-time floor TmaView::GetMinimumSize()
@@ -113,7 +123,7 @@ if ! [[ "$_tma_startup_url" =~ ^[A-Za-z][A-Za-z0-9+.-]*: ]]; then
   die "tma.conf: startup URL '$_tma_startup_url' has no scheme -- write url:<scheme>://..."
 fi
 
-log "identity: app_name=$_tma_app_name app_id=$_tma_app_id"
+log "identity: version=$_tma_version app_name=$_tma_app_name app_id=$_tma_app_id"
 log "startup:   $_tma_startup"
 log "min size:  ${_tma_min_width}x${_tma_min_height}"
 
@@ -613,6 +623,7 @@ EOF
 GN_ARGS="$GN_ARGS
 tma_app_name = \"$(tma_conf_gn_escape "$_tma_app_name")\"
 tma_app_id = \"$(tma_conf_gn_escape "$_tma_app_id")\"
+tma_version = \"$(tma_conf_gn_escape "$_tma_version")\"
 tma_startup_url = \"$(tma_conf_gn_escape "$_tma_startup_url")\"tma_min_width = $_tma_min_width
 tma_min_height = $_tma_min_height
 # The tag the checkout was pinned to two screens ago, which is what the

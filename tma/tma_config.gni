@@ -28,6 +28,10 @@ declare_args() {
   # once this is shipped as something other than "tma".
   tma_app_id = "tma"
 
+  # TMA's own release number, reported by --version next to the Chromium it
+  # embeds. Keep it equal to `version` in tma.conf; setup overwrites it.
+  tma_version = "0.1.0"
+
   # The one URL the window opens. setup_chromium.sh owns the format of the
   # `startup` key in tma.conf and strips its "url:" prefix, so this file never
   # has to interpret a string. Empty only if someone hand-edits args.gn:
